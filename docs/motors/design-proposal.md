@@ -3,7 +3,7 @@
 **Status:** Proposal
 **Date:** 2026-03-20
 
-## Executive Summary
+## Objectives
 
 This proposal outlines the design and implementation plan for adding comprehensive motor database support with electrical characteristics tracking to mjlab. The system will enable users to:
 
