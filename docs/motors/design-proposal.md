@@ -6,9 +6,6 @@
 ## Objectives
 
 This proposal outlines the design and implementation plan for adding comprehensive motor database support with electrical characteristics tracking to mjlab. The system will enable users to:
-
-- Reference real servo motor specifications from a centralized database
-- Track electrical characteristics (current, voltage, power, heat) at each simulation step
 - Model realistic electrical constraints and thermal behavior
 - Validate energy efficiency of control policies
 
@@ -76,8 +73,6 @@ export MJLAB_MOTOR_PATH="/path/to/motors:/another/path/to/motors"
 
 # Point to cloned GitHub repo
 export MJLAB_MOTOR_PATH="$HOME/repos/mjlab-motors/community:$MJLAB_MOTOR_PATH"
-```
-
 **Configuration File** (`~/.mjlab/config.yaml`):
 ```yaml
 motor_database:
@@ -85,38 +80,23 @@ motor_database:
     - /path/to/custom/motors
     - ~/projects/robot/motors
   remote_repositories:
-    - url: https://github.com/mjlab-motors/community
       branch: main
       cache_dir: ~/.mjlab/cache/motors/community
 ```
-
-**Programmatic Configuration**:
 ```python
 from mjlab.motor_database import MotorDatabaseConfig
 
-# Configure at runtime
 config = MotorDatabaseConfig.get()
 config.add_search_path("/path/to/motors")
 config.add_remote_repository(
-    url="https://github.com/user/motors",
-    branch="main"
-)
 ```
 
 ### External Repository Structure
-
-**Recommended structure for external motor repositories**:
-
 ```
 motor-database-repo/
 ├── README.md
-├── motors/
-│   ├── unitree/
 │   │   ├── unitree_7520_14.json
 │   │   ├── unitree_5020_9.json
-│   │   └── README.md
-│   ├── maxon/
-│   │   ├── maxon_ec90_flat_70w.json
 │   │   └── README.md
 │   └── custom/
 │       └── my_custom_motor.json
