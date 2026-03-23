@@ -1,0 +1,83 @@
+<mujoco model="unitree_g1_simple">
+  <compiler angle="radian" autolimits="true"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <worldbody>
+    <body name="torso" pos="0 0 0.8">
+      <geom type="box" size="0.1 0.15 0.05" mass="5.0"/>
+      <joint name="root_x" type="slide" axis="1 0 0"/>
+      <joint name="root_y" type="slide" axis="0 1 0"/>
+      <joint name="root_z" type="slide" axis="0 0 1"/>
+
+      <!-- Left Hip -->
+      <body name="left_hip" pos="0 0.1 0">
+        <geom type="capsule" size="0.04" fromto="0 0 0 0 0.05 -0.15" mass="0.8"/>
+        <joint name="left_hip_pitch" type="hinge" axis="0 1 0" range="-1.57 1.57" damping="0.5"/>
+
+        <!-- Left Knee -->
+        <body name="left_knee" pos="0 0.05 -0.15">
+          <geom type="capsule" size="0.035" fromto="0 0 0 0 0 -0.25" mass="0.5"/>
+          <joint name="left_knee" type="hinge" axis="0 1 0" range="0 2.7" damping="0.5"/>
+        </body>
+      </body>
+
+      <!-- Right Hip -->
+      <body name="right_hip" pos="0 -0.1 0">
+        <geom type="capsule" size="0.04" fromto="0 0 0 0 -0.05 -0.15" mass="0.8"/>
+        <joint name="right_hip_pitch" type="hinge" axis="0 1 0" range="-1.57 1.57" damping="0.5"/>
+
+        <!-- Right Knee -->
+        <body name="right_knee" pos="0 -0.05 -0.15">
+          <geom type="capsule" size="0.035" fromto="0 0 0 0 0 -0.25" mass="0.5"/>
+          <joint name="right_knee" type="hinge" axis="0 1 0" range="0 2.7" damping="0.5"/>
+        </body>
+      </body>
+
+      <!-- Left Arm -->
+      <body name="left_arm" pos="0 0.15 0">
+        <geom type="capsule" size="0.03" fromto="0 0 0 0 0.2 0" mass="0.3"/>
+        <joint name="left_shoulder" type="hinge" axis="0 0 1" range="-1.57 1.57" damping="0.3"/>
+      </body>
+
+      <!-- Right Arm -->
+      <body name="right_arm" pos="0 -0.15 0">
+        <geom type="capsule" size="0.03" fromto="0 0 0 0 -0.2 0" mass="0.3"/>
+        <joint name="right_shoulder" type="hinge" axis="0 0 1" range="-1.57 1.57" damping="0.3"/>
+      </body>
+    </body>
+
+    <light pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+  </worldbody>
+
+  <actuator>
+    <!-- Leg actuators - high torque motors -->
+    <motor name="left_hip_motor" joint="left_hip_pitch" gear="14.5"/>
+    <motor name="left_knee_motor" joint="left_knee" gear="9.0"/>
+    <motor name="right_hip_motor" joint="right_hip_pitch" gear="14.5"/>
+    <motor name="right_knee_motor" joint="right_knee" gear="9.0"/>
+
+    <!-- Arm actuators - lower torque motors -->
+    <motor name="left_shoulder_motor" joint="left_shoulder" gear="5.0"/>
+    <motor name="right_shoulder_motor" joint="right_shoulder" gear="5.0"/>
+  </actuator>
+
+  <!-- Motor and Battery specifications -->
+  <custom>
+    <!-- Motor specs for leg actuators (Unitree 7520 with 14:1 gear) -->
+    <text name="motor_left_hip_motor" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_left_knee_motor" data="motor_spec:unitree_5020_9"/>
+    <text name="motor_right_hip_motor" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_right_knee_motor" data="motor_spec:unitree_5020_9"/>
+
+    <!-- Motor specs for arm actuators (smaller motors) -->
+    <text name="motor_left_shoulder_motor" data="motor_spec:unitree_5020_9"/>
+    <text name="motor_right_shoulder_motor" data="motor_spec:unitree_5020_9"/>
+
+    <!-- Battery specification (Unitree G1 9Ah Li-ion, 21.6V nominal, ~2hr runtime) -->
+    <text name="battery_main" data="battery_spec:unitree_g1_9ah"/>
+
+    <!-- Battery-entity mapping -->
+    <text name="battery_entity_robot" data="battery:battery_main"/>
+  </custom>
+</mujoco>
