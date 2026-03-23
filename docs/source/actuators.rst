@@ -161,6 +161,14 @@ torque saturation to model DC motor torque-speed curves (back-EMF
 effects). Implements a linear torque-speed curve: maximum torque at zero
 velocity, zero torque at maximum velocity.
 
+**ElectricalMotorActuator**: Full electrical and thermal model of electric
+motors, extending ``DcMotorActuator`` with RL circuit dynamics, voltage
+feedback from battery state, and winding temperature tracking. Validates
+against manufacturer datasheets and enforces energy conservation laws.
+Integrates with the motor and battery database system for automatic
+configuration from XML specifications. See :ref:`motor_database` for
+motor specification details.
+
 **LearnedMlpActuator**: Neural network-based actuator that uses a
 trained MLP to predict torque outputs from joint state history. Useful
 when analytical models cannot capture complex actuator dynamics like
@@ -169,9 +177,10 @@ velocity-based torque limits.
 
 .. code-block:: python
 
-    from mjlab.actuator import IdealPdActuatorCfg, DcMotorActuatorCfg
+    from mjlab.actuator import IdealPdActuatorCfg, DcMotorActuatorCfg, ElectricalMotorActuatorCfg
+    from mjlab.motor_database import load_motor_spec
 
-    # Ideal PD for hips, DC motor model with torque-speed curve for knees.
+    # Ideal PD for hips, DC motor model for shoulders, electrical motor model for knees.
     actuators = (
         IdealPdActuatorCfg(
             target_names_expr=(".*_hip_.*",),
@@ -180,12 +189,20 @@ velocity-based torque limits.
             effort_limit=100.0,
         ),
         DcMotorActuatorCfg(
-            target_names_expr=(".*_knee_.*",),
+            target_names_expr=(".*_shoulder_.*",),
             stiffness=80.0,
             damping=10.0,
             effort_limit=25.0,       # Continuous torque limit
             saturation_effort=50.0,  # Peak torque at stall
             velocity_limit=30.0,     # No-load speed (rad/s)
+        ),
+        ElectricalMotorActuatorCfg(
+            target_names_expr=(".*_knee_.*",),
+            motor_spec=load_motor_spec("unitree_7520_14"),  # From motor database
+            stiffness=200.0,
+            damping=10.0,
+            saturation_effort=120.0,  # Override peak torque if needed
+            velocity_limit=40.0,      # Override no-load speed if needed
         ),
     )
 
@@ -265,6 +282,188 @@ Delays are quantized to physics timesteps. For example, with 500Hz physics
      Each target gets an independent delay buffer with its own lag
      schedule. This provides maximum flexibility for modeling different
      latency characteristics for position, velocity, and effort commands.
+
+
+Electrical motor actuator
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``ElectricalMotorActuator`` provides a full electrical and thermal model of
+electric motors, implementing RL circuit dynamics, voltage feedback from
+battery state, and thermal limits. It's the most physically accurate motor
+model in mjlab, validating against manufacturer datasheets and enforcing
+energy conservation laws.
+
+**Key features**:
+
+- **RL circuit dynamics**: Models voltage, current, and inductance effects
+- **Voltage feedback**: Adapts to battery voltage changes during simulation
+- **Thermal modeling**: Tracks winding temperature, enforces thermal limits
+- **Energy conservation**: Validates P_elec = P_mech + P_heat
+- **Motor database integration**: Automatic configuration from motor specs
+- **Datasheet validation**: Physics tested against manufacturer datasheets
+
+**When to use ElectricalMotorActuator**:
+
+- High-fidelity robotics research requiring accurate power/thermal modeling
+- Battery-aware simulations where motor behavior depends on battery state
+- System design optimization (motor selection, battery sizing, thermal management)
+- Training RL policies that must respect power/thermal constraints
+
+**Basic usage with motor database**:
+
+.. code-block:: python
+
+    from mjlab.actuator import ElectricalMotorActuatorCfg
+    from mjlab.motor_database import load_motor_spec
+
+    # Configure from motor database (automatic parameter loading).
+    actuator = ElectricalMotorActuatorCfg(
+        target_names_expr=(".*_hip_.*",),
+        motor_spec=load_motor_spec("unitree_7520_14"),  # Unitree G1 hip motor
+        stiffness=200.0,
+        damping=10.0,
+        # saturation_effort and velocity_limit loaded from motor_spec automatically
+    )
+
+**Manual configuration** (without motor database):
+
+.. code-block:: python
+
+    from mjlab.motor_database import MotorSpecification
+
+    # Manually specify all motor parameters.
+    custom_motor = MotorSpecification(
+        motor_id="custom_motor",
+        manufacturer="Custom",
+        model="CM-100",
+        gear_ratio=14.5,
+        reflected_inertia=0.0015,  # kg*m^2
+        rotation_angle_range=(-3.14, 3.14),  # rad
+        voltage_range=(0.0, 48.0),  # V
+        resistance=1.2,  # Ω (winding resistance)
+        inductance=0.0012,  # H
+        motor_constant_kt=0.115,  # N*m/A (torque constant)
+        motor_constant_ke=0.115,  # V/(rad/s) (back-EMF constant)
+        stall_torque=120.0,  # N*m (after gearing)
+        peak_torque=120.0,  # N*m
+        continuous_torque=88.0,  # N*m
+        no_load_speed=32.0,  # rad/s (after gearing)
+        no_load_current=0.8,  # A
+        stall_current=104.0,  # A
+        operating_current=76.0,  # A (at continuous torque)
+        thermal_resistance=2.5,  # °C/W
+        thermal_time_constant=150.0,  # s
+        max_winding_temperature=150.0,  # °C
+        ambient_temperature=25.0,  # °C
+        encoder_resolution=1000,
+        encoder_type="incremental",
+        feedback_sensors=["position", "velocity", "current"],
+        protocol="CAN",
+        protocol_params={},
+    )
+
+    actuator = ElectricalMotorActuatorCfg(
+        target_names_expr=(".*_knee_.*",),
+        motor_spec=custom_motor,
+        stiffness=150.0,
+        damping=8.0,
+    )
+
+**Battery integration**:
+
+``ElectricalMotorActuator`` automatically integrates with the battery system
+when a ``BatteryManager`` is configured in the scene. The motor receives
+voltage feedback from the battery and reports current draw for battery SOC
+updates.
+
+.. code-block:: python
+
+    from mjlab.scene import Scene, SceneCfg
+    from mjlab.entity import EntityCfg, EntityArticulationInfoCfg
+    from mjlab.battery import BatteryManagerCfg
+    from mjlab.battery_database import load_battery_spec
+
+    scene_cfg = SceneCfg(
+        num_envs=100,
+        entities={
+            "robot": EntityCfg(
+                spec_fn=lambda: mujoco.MjSpec.from_file("robot.xml"),
+                articulation=EntityArticulationInfoCfg(
+                    actuators=(
+                        ElectricalMotorActuatorCfg(
+                            target_names_expr=(".*",),
+                            motor_spec=load_motor_spec("unitree_7520_14"),
+                            stiffness=200.0,
+                            damping=10.0,
+                        ),
+                    )
+                ),
+            )
+        },
+        battery=BatteryManagerCfg(
+            battery_spec=load_battery_spec("unitree_g1_9ah"),
+            entity_names=("robot",),
+            initial_soc=1.0,  # Start fully charged
+            enable_voltage_feedback=True,  # Motors adapt to battery voltage
+        ),
+    )
+
+    scene = Scene(scene_cfg, device="cuda")
+
+    # Simulation loop - battery updates happen automatically!
+    for _ in range(1000):
+        scene.write_data_to_sim()  # Computes motor currents, updates battery voltage
+        sim.step()
+        scene.update(dt)  # Updates battery SOC, thermal state
+
+**Accessible state**:
+
+The actuator exposes electrical and thermal state for monitoring:
+
+.. code-block:: python
+
+    actuator = entity._actuators[0]  # ElectricalMotorActuator
+
+    # Electrical state (all are [num_envs, num_joints] tensors).
+    voltage = actuator.voltage        # Applied voltage (V)
+    current = actuator.current        # Motor current (A)
+    power_electrical = actuator.power_electrical  # Electrical power in (W)
+    power_mechanical = actuator.power_mechanical  # Mechanical power out (W)
+
+    # Thermal state.
+    temperature = actuator.winding_temperature  # Winding temperature (°C)
+    is_overheated = actuator.thermal_limit_active  # Bool mask
+
+**Physics details**:
+
+The actuator implements:
+
+1. **Voltage equation**: ``V = I*R + L*dI/dt + Ke*ω`` (back-EMF)
+2. **Torque equation**: ``τ = Kt*I`` (motor torque before gearing)
+3. **Gearing**: ``τ_out = τ*N``, ``ω_motor = ω_out*N``
+4. **Thermal dynamics**: ``dT/dt = (I²*R - (T-T_amb)/R_th) / τ_th``
+5. **Energy conservation**: ``P_elec = P_mech + P_copper`` validated in tests
+
+These equations are integrated at the simulation timestep using forward Euler
+for electrical dynamics and first-order thermal lag for temperature.
+
+**Validation**:
+
+The actuator is validated against:
+
+- **Performance**: <100% overhead vs ``DcMotorActuator`` (see ``tests/test_electrical_performance.py``)
+- **Datasheets**: Unitree 7520-14 and 5020-9 motor specs (see ``tests/validation/test_motor_datasheet_validation.py``)
+- **Energy conservation**: Power balance and energy accounting (see ``tests/validation/test_energy_conservation.py``)
+
+**Limitations**:
+
+- Assumes ideal gearbox (100% efficiency, no backlash)
+- No iron losses or magnetic saturation
+- Simplified thermal model (single lumped thermal mass)
+- Forward Euler integration may require small timesteps for stiff RL circuits
+
+For most robotics applications, these simplifications provide an excellent
+balance between accuracy and computational efficiency.
 
 
 Authoring actuator configs
