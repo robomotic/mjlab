@@ -87,6 +87,9 @@ class EntityCfg:
   definition order rather than the order actuators appear in the config. XML actuators
   are excluded from sorting and always retain their declaration order.
   """
+  auto_discover_motors: bool = True
+  """Automatically discover motor specs from XML <custom><text> elements and create
+  ElectricalMotorActuators. Only applies if articulation is None."""
 
   # Editors.
   lights: tuple[spec_cfg.LightCfg, ...] = field(default_factory=tuple)
@@ -145,6 +148,9 @@ class Entity:
     self._build_spec()
     self._identify_joints()
     self._apply_spec_editors()
+    # Auto-discover motors before adding explicit actuators
+    if cfg.auto_discover_motors and cfg.articulation is None:
+      self._auto_discover_motors()
     self._add_actuators()
     self._add_initial_state_keyframe()
 
@@ -171,6 +177,75 @@ class Entity:
     ]:
       for cfg in cfg_list:
         cfg.edit_spec(self._spec)
+
+  def _auto_discover_motors(self) -> None:
+    """Auto-discover motor specs from XML and create ElectricalMotorActuators.
+
+    Scans the spec for <custom><text name="motor_*"> elements and groups
+    motors by spec ID for efficient batching.
+    """
+    from mjlab.actuator import ElectricalMotorActuatorCfg
+    from mjlab.motor_database import load_motor_spec
+    from mjlab.motor_database.xml_integration import parse_motor_specs_from_xml
+
+    # Parse motor specs from XML (maps actuator_name -> motor_id)
+    motor_specs = parse_motor_specs_from_xml(self._spec)
+    if not motor_specs:
+      return  # No motors to discover
+
+    # Build mapping from actuator name to joint name
+    actuator_to_joint: dict[str, str] = {}
+    for mj_actuator in self._spec.actuators:
+      # Check if this actuator targets a joint
+      if (
+        mj_actuator.name
+        and mj_actuator.trntype == mujoco.mjtTrn.mjTRN_JOINT
+        and mj_actuator.target
+      ):
+        actuator_to_joint[mj_actuator.name] = mj_actuator.target
+
+    # Group joints by motor spec ID for efficient batching
+    motor_groups: dict[str, list[str]] = {}
+    for actuator_name, motor_id in motor_specs.items():
+      # Find the joint targeted by this actuator
+      joint_name = actuator_to_joint.get(actuator_name)
+      if joint_name is None:
+        continue  # Skip actuators that don't target joints
+
+      if motor_id not in motor_groups:
+        motor_groups[motor_id] = []
+      motor_groups[motor_id].append(joint_name)
+
+    # Create ElectricalMotorActuatorCfg for each motor type
+    actuators = []
+    for motor_id, joint_names in motor_groups.items():
+      motor_spec = load_motor_spec(motor_id)
+
+      # Create regex pattern matching all joints with this motor
+      pattern = f"({'|'.join(joint_names)})"
+
+      actuator_cfg = ElectricalMotorActuatorCfg(
+        target_names_expr=(pattern,),
+        motor_spec=motor_spec,
+        stiffness=200.0,  # Sensible defaults
+        damping=10.0,
+        saturation_effort=motor_spec.peak_torque,
+        velocity_limit=motor_spec.no_load_speed,
+      )
+      actuators.append(actuator_cfg)
+
+    # Delete existing actuators from spec (they'll be replaced by electrical motor actuators)
+    # We need to delete them so there's no name collision
+    for actuator_name in motor_specs.keys():
+      # Find matching actuator in spec
+      matching_actuators = [
+        act for act in self._spec.actuators if act.name == actuator_name
+      ]
+      for act in matching_actuators:
+        self._spec.delete(act)
+
+    # Update config with auto-discovered actuators
+    self.cfg.articulation = EntityArticulationInfoCfg(actuators=tuple(actuators))
 
   def _add_actuators(self) -> None:
     if self.cfg.articulation is None:

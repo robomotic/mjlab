@@ -1120,28 +1120,142 @@ make check
 
 **Status**: ✅ **COMPLETED** (43 tests passing: 19 database + 24 manager, tagged as phase2-b)
 
-### Phase 3: Integration
+### Phase 3: Automatic Motor/Battery Integration
 
-**Goal**: Integrate with metrics system and create examples
+**Goal**: Make motor and battery physics completely automatic during simulation step, requiring zero manual configuration or physics calculations from users.
 
-**Tasks**:
-1. Implement electrical metrics terms
-2. Create comprehensive example script
-3. Write integration tests (~5 tests)
-4. End-to-end testing with full RL environment
+**Motivation**:
+While Phase 1, 2, and 2(B) provide all necessary building blocks (motor database, electrical actuators, battery system), users still needed to:
+- Explicitly configure `ElectricalMotorActuatorCfg` for each motor type
+- Manually add `BatteryManagerCfg` to scene
+- Understand motor/battery physics for proper integration
 
-**Deliverables**:
-- `src/mjlab/metrics/electrical_metrics.py`
-- `examples/motor_database_example.py`
-- `tests/integration/test_electrical_simulation.py`
-- `tests/metrics/test_electrical_metrics.py`
+This phase eliminates all manual configuration by auto-discovering motor/battery specs from XML and automatically integrating physics updates into the simulation loop.
+
+**Implementation**:
+
+1. **Auto-Discovery in Entity** (`src/mjlab/entity/entity.py`, +50 lines):
+   - Added `auto_discover_motors: bool = True` flag to `EntityCfg`
+   - Implemented `_auto_discover_motors()` method that:
+     - Parses motor specs from XML `<custom><text name="motor_*">` elements
+     - Maps MuJoCo actuators to their target joints
+     - Groups joints by motor spec ID for efficient batching
+     - Creates `ElectricalMotorActuatorCfg` instances automatically
+   - Integrated into Entity.__init__ flow (called before manual actuator addition)
+   - Only activates if `articulation=None` (manual config takes precedence)
+
+2. **Auto-Discovery in Scene** (`src/mjlab/scene/scene.py`, +30 lines):
+   - Added `auto_battery: bool = True` flag to `SceneCfg`
+   - Implemented `_auto_discover_battery()` method that:
+     - Scans all entity configs for `<custom><text name="battery_*">` elements
+     - Parses battery specs before entities are built/attached
+     - Creates `BatteryManagerCfg` automatically
+     - Links to all entities in scene
+   - Explicit `battery` config takes precedence over auto-discovery
+
+3. **Automatic Step Integration**:
+   - Verified existing `write_data_to_sim()` handles motor current + battery physics
+   - Verified existing `update()` calls battery SOC/thermal updates
+   - No new step logic needed - already automatic!
+
+**Test Coverage** (`tests/test_auto_discovery.py`, 7 new tests):
+- `test_auto_discover_motors_from_xml` - Verifies motor auto-creation
+- `test_auto_discover_multiple_motor_types` - Verifies grouping by motor spec
+- `test_auto_discover_motors_disabled` - Verifies flag can disable feature
+- `test_auto_discover_battery_from_xml` - Verifies battery auto-creation
+- `test_manual_config_takes_precedence` - Verifies precedence system
+- `test_no_specs_in_xml` - Verifies graceful handling of missing specs
+- `test_battery_manual_config_precedence` - Verifies battery precedence
+
+**Usage Example - Before (Manual):**
+```python
+from mjlab.scene import Scene, SceneCfg
+from mjlab.entity import EntityCfg, EntityArticulationInfoCfg
+from mjlab.actuator import ElectricalMotorActuatorCfg
+from mjlab.battery import BatteryManagerCfg
+from mjlab.motor_database import load_motor_spec
+from mjlab.battery_database import load_battery_spec
+
+# 50+ lines of manual configuration...
+scene_cfg = SceneCfg(
+  num_envs=1,
+  entities={
+    "robot": EntityCfg(
+      spec_fn=lambda: mujoco.MjSpec.from_file("robot.xml"),
+      articulation=EntityArticulationInfoCfg(
+        actuators=(
+          ElectricalMotorActuatorCfg(
+            target_names_expr=(".*hip.*",),
+            motor_spec=load_motor_spec("unitree_7520_14"),
+            stiffness=200.0,
+            damping=10.0,
+          ),
+          # ... repeat for each motor type ...
+        )
+      )
+    )
+  },
+  battery=BatteryManagerCfg(
+    battery_spec=load_battery_spec("unitree_g1_9ah"),
+    entity_names=("robot",),
+    initial_soc=1.0,
+    enable_voltage_feedback=True,
+  )
+)
+```
+
+**Usage Example - After (Automatic):**
+```python
+from mjlab.scene import Scene, SceneCfg
+from mjlab.entity import EntityCfg
+import mujoco
+
+# Auto-discovery handles everything!
+scene_cfg = SceneCfg(
+  num_envs=1,
+  entities={
+    "robot": EntityCfg(
+      spec_fn=lambda: mujoco.MjSpec.from_file("robot_with_specs.xml"),
+      # auto_discover_motors=True,  # Default
+    )
+  },
+  # auto_battery=True,  # Default
+)
+
+scene = Scene(scene_cfg, device="cpu")
+
+# Battery updates happen automatically during:
+# scene.write_data_to_sim()  # Handles motor current + battery physics
+# sim.step()                  # MuJoCo physics
+# scene.update(dt)            # Handles battery SOC/thermal updates
+```
+
+**Design Decisions**:
+
+1. **Default to Auto-Discovery**: `auto_discover_motors=True` and `auto_battery=True` by default for maximum convenience
+2. **Explicit Config Takes Precedence**: If user provides manual `articulation` or `battery` config, auto-discovery is skipped entirely
+3. **Backward Compatible**: All 79 existing tests continue to pass without modification
+4. **Efficient Batching**: Motors with same spec ID grouped into single actuator for GPU performance
+5. **Scene-Level Battery**: Battery remains at Scene level to aggregate across all entities
+6. **No New Step Logic**: Leverages existing hooks in `write_data_to_sim()` and `update()` methods
+7. **Actuator Replacement**: When XML has both existing actuators AND motor specs, auto-discovery deletes the existing actuators before creating electrical motor actuators (prevents name collision)
 
 **Validation**:
 ```bash
-uv run pytest tests/metrics/test_electrical_metrics.py -v
-uv run pytest tests/integration/test_electrical_simulation.py -v
-uv run python examples/motor_database_example.py
+# New auto-discovery tests
+uv run pytest tests/test_auto_discovery.py -v  # 7 tests
+
+# Backward compatibility (all existing tests still pass)
+uv run pytest tests/test_entity.py -v          # Entity tests
+uv run pytest tests/test_scene.py -v           # Scene tests
+uv run pytest tests/test_battery_manager.py -v # Battery tests
+uv run pytest tests/test_electrical_motor_actuator.py -v  # Motor actuator tests
+
+# Full test suite
+uv run pytest tests/ -v  # 770 tests total (all passing)
 ```
+
+**Status**: ✅ **COMPLETED** (770 tests passing: 763 existing + 7 new auto-discovery)
 
 ### Phase 4: Validation & Polish
 

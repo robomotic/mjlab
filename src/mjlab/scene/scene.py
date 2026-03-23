@@ -43,7 +43,11 @@ class SceneCfg:
   """Sensor configurations to attach to the scene."""
 
   battery: BatteryManagerCfg | None = None
-  """Optional battery manager configuration for power-limited simulation."""
+  """Optional battery manager configuration for power-limited simulation.
+  Takes precedence over auto_battery."""
+
+  auto_battery: bool = True
+  """Automatically discover and create battery from entity XML specs."""
 
   extent: float | None = None
   """Override for ``mjModel.stat.extent``. If ``None``, MuJoCo computes
@@ -74,9 +78,13 @@ class Scene:
     if self._cfg.spec_fn is not None:
       self._cfg.spec_fn(self._spec)
 
-    # Create battery manager after entities are added
-    if self._cfg.battery is not None:
-      self._battery_manager = BatteryManager(self._cfg.battery, self)
+    # Create battery manager: explicit config takes precedence over auto-discovery
+    battery_cfg = self._cfg.battery
+    if battery_cfg is None and self._cfg.auto_battery:
+      battery_cfg = self._auto_discover_battery()
+
+    if battery_cfg is not None:
+      self._battery_manager = BatteryManager(battery_cfg, self)
 
   def compile(self) -> mujoco.MjModel:
     return self._spec.compile()
@@ -318,3 +326,31 @@ class Scene:
           # Dynamically update voltage max (broadcast across joints)
           # battery_voltage is (num_envs,), actuator._voltage_max is (num_envs, num_joints)
           actuator._voltage_max[:] = battery_voltage.unsqueeze(1)
+
+  def _auto_discover_battery(self) -> BatteryManagerCfg | None:
+    """Auto-discover battery specs from entity XML files.
+
+    Scans all entity configs for <custom><text name="battery_*"> elements.
+    Returns BatteryManagerCfg if found, None otherwise.
+    """
+    from mjlab.battery_database import load_battery_spec
+    from mjlab.battery_database.xml_integration import parse_battery_specs_from_xml
+
+    # Check each entity config (before they're built/attached)
+    for entity_cfg in self._cfg.entities.values():
+      # Call spec_fn to get a fresh spec with custom elements
+      spec = entity_cfg.spec_fn()
+      battery_specs = parse_battery_specs_from_xml(spec)
+      if battery_specs:
+        # Found battery - use first one
+        battery_id = list(battery_specs.values())[0]
+        battery_spec = load_battery_spec(battery_id)
+
+        return BatteryManagerCfg(
+          battery_spec=battery_spec,
+          entity_names=tuple(self._cfg.entities.keys()),
+          initial_soc=1.0,  # Start fully charged
+          enable_voltage_feedback=True,
+        )
+
+    return None
