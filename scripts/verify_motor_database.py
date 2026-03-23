@@ -4,7 +4,6 @@ Quick verification script for motor database implementation.
 This can be run without the full mjlab environment.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -12,12 +11,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import the motor database modules (this won't trigger mjlab.__init__)
-from mjlab.motor_database.motor_spec import MotorSpecification
 from mjlab.motor_database.database import (
   BUILTIN_MOTORS_PATH,
   get_default_search_paths,
   load_motor_spec,
 )
+from mjlab.motor_database.motor_spec import MotorSpecification
 
 print("=" * 60)
 print("Motor Database Verification")
