@@ -1,14 +1,14 @@
-# Motor Spec XML Storage: Solution
+# Motor and Battery Spec XML Storage: Solution
 
 **Date**: 2026-03-23
 **Status**: Tested & Verified
 
 ## Problem
 
-We need to store motor_spec references in MuJoCo XML files such that:
+We need to store motor_spec and battery_spec references in MuJoCo XML files such that:
 1. Standard MuJoCo can load the XML without errors
-2. The motor_spec is preserved through write/read cycles
-3. mjlab can auto-detect and load motor specs
+2. The specs are preserved through write/read cycles
+3. mjlab can auto-detect and load motor/battery specs
 
 ## MuJoCo XML Schema Constraints
 
@@ -16,6 +16,7 @@ We need to store motor_spec references in MuJoCo XML files such that:
 ```xml
 <!-- This BREAKS - MuJoCo rejects unknown attributes -->
 <motor name="motor1" joint="joint1" motor_spec="test_motor"/>
+<text name="battery1" battery_spec="turnigy_6s2p_5000mah"/>
 ```
 Error: `ValueError: XML Error: Schema violation: unrecognized attribute`
 
@@ -45,6 +46,12 @@ MuJoCo officially supports custom text data in `<custom>` section:
   <!-- Motor specifications stored in custom text data -->
   <custom>
     <text name="motor_left_hip" data="motor_spec:unitree_7520_14"/>
+
+    <!-- Battery specification (scene-level) -->
+    <text name="battery_main" data="battery_spec:turnigy_6s2p_5000mah"/>
+
+    <!-- Optional: Map entities to batteries -->
+    <text name="battery_entity_robot" data="battery:battery_main"/>
   </custom>
 </mujoco>
 ```
@@ -55,12 +62,21 @@ MuJoCo officially supports custom text data in `<custom>` section:
 2. ✅ **Preserved through roundtrips** - `spec.to_xml()` includes custom text
 3. ✅ **Accessible in Python** - Can iterate `spec.texts`
 4. ✅ **Official MuJoCo feature** - Documented and supported
-5. ✅ **Flexible** - Can store multiple motor specs, metadata, etc.
+5. ✅ **Flexible** - Can store motor specs, battery specs, metadata, etc.
 
 ### Usage Pattern
 
-**Naming convention:** `motor_{actuator_name}`
-**Data format:** `motor_spec:{motor_id}`
+**Motor specs:**
+- Naming convention: `motor_{actuator_name}`
+- Data format: `motor_spec:{motor_id}`
+
+**Battery specs:**
+- Naming convention: `battery_{battery_name}`
+- Data format: `battery_spec:{battery_id}`
+
+**Battery-entity mapping:**
+- Naming convention: `battery_entity_{entity_name}`
+- Data format: `battery:{battery_name}`
 
 ## Implementation
 
@@ -72,6 +88,16 @@ def write_motor_spec_to_xml(spec: mujoco.MjSpec, actuator_name: str, motor_id: s
     text = spec.add_text()
     text.name = f"motor_{actuator_name}"
     text.data = f"motor_spec:{motor_id}"
+```
+
+### Writing Battery Spec to XML
+
+```python
+def write_battery_spec_to_xml(spec: mujoco.MjSpec, battery_name: str, battery_id: str):
+    """Add battery_spec as custom text data."""
+    text = spec.add_text()
+    text.name = f"battery_{battery_name}"
+    text.data = f"battery_spec:{battery_id}"
 ```
 
 ### Reading Motor Spec from XML
@@ -93,6 +119,27 @@ def parse_motor_specs(spec: mujoco.MjSpec) -> dict[str, str]:
             motor_specs[actuator_name] = motor_id
 
     return motor_specs
+```
+
+### Reading Battery Spec from XML
+
+```python
+def parse_battery_specs(spec: mujoco.MjSpec) -> dict[str, str]:
+    """Parse battery specs from custom text elements.
+
+    Returns:
+        Dict mapping battery_name -> battery_id
+    """
+    battery_specs = {}
+
+    for text in spec.texts:
+        # Check if this is a battery_spec entry
+        if text.name.startswith("battery_") and text.data.startswith("battery_spec:"):
+            battery_name = text.name[8:]  # Remove "battery_" prefix
+            battery_id = text.data.split(":", 1)[1]
+            battery_specs[battery_name] = battery_id
+
+    return battery_specs
 ```
 
 ### Auto-Loading in Entity
@@ -120,11 +167,33 @@ def _create_electrical_actuators_from_xml(self, spec: mujoco.MjSpec):
         auto_actuators.append(actuator)
 
     return auto_actuators
+
+def _create_battery_manager_from_xml(self, spec: mujoco.MjSpec):
+    """Auto-create battery manager for battery specs in XML."""
+    from mjlab.battery_database import load_battery_spec
+    from mjlab.battery import BatteryManagerCfg
+
+    # Parse battery specs from XML
+    battery_specs = parse_battery_specs(spec)
+
+    # Create battery manager (use first battery spec found)
+    if battery_specs:
+        battery_name, battery_id = next(iter(battery_specs.items()))
+        battery_spec = load_battery_spec(battery_id)
+
+        cfg = BatteryManagerCfg(
+            battery_spec=battery_spec,
+            entity_names=(self.name,),
+        )
+
+        return cfg
+
+    return None
 ```
 
 ## Complete Example
 
-### Robot XML with Motor Specs
+### Robot XML with Motor and Battery Specs
 
 ```xml
 <mujoco model="unitree_g1">
@@ -147,10 +216,17 @@ def _create_electrical_actuators_from_xml(self, spec: mujoco.MjSpec):
     <motor name="left_knee_motor" joint="left_knee" gear="9.0"/>
   </actuator>
 
-  <!-- Motor specifications -->
+  <!-- Motor and Battery specifications -->
   <custom>
+    <!-- Motor specs for each actuator -->
     <text name="motor_left_hip_motor" data="motor_spec:unitree_7520_14"/>
     <text name="motor_left_knee_motor" data="motor_spec:unitree_5020_9"/>
+
+    <!-- Battery specification (scene-level) -->
+    <text name="battery_main" data="battery_spec:turnigy_6s2p_5000mah"/>
+
+    <!-- Battery-entity mapping (which entity uses this battery) -->
+    <text name="battery_entity_robot" data="battery:battery_main"/>
   </custom>
 </mujoco>
 ```
@@ -158,11 +234,17 @@ def _create_electrical_actuators_from_xml(self, spec: mujoco.MjSpec):
 ### Loading in mjlab
 
 ```python
+from mjlab.scene import SceneCfg
 from mjlab.entity import EntityCfg
 
-# Simple - motor specs auto-detected from <custom><text> elements!
-robot = EntityCfg(
-    spec_fn=lambda: mujoco.MjSpec.from_file("unitree_g1.xml")
+# Simple - motor and battery specs auto-detected from <custom><text> elements!
+scene_cfg = SceneCfg(
+    num_envs=4,
+    entities={
+        "robot": EntityCfg(
+            spec_fn=lambda: mujoco.MjSpec.from_file("unitree_g1.xml")
+        )
+    }
 )
 
 # mjlab automatically:
@@ -170,7 +252,11 @@ robot = EntityCfg(
 # 2. Extracts motor_spec:motor_id
 # 3. Calls load_motor_spec(motor_id)
 # 4. Creates ElectricalMotorActuator
-# 5. Electrical simulation runs!
+# 5. Parses <custom><text name="battery_*"> elements
+# 6. Extracts battery_spec:battery_id
+# 7. Calls load_battery_spec(battery_id)
+# 8. Creates BatteryManager at scene level
+# 9. Battery powers motors with dynamic voltage feedback!
 ```
 
 ## MuJoCo Menagerie Integration
@@ -180,17 +266,20 @@ This approach is perfect for Menagerie:
 ```
 mujoco_menagerie/
 ├── unitree_g1/
-│   ├── g1.xml                    # Robot with <custom><text> motor specs
+│   ├── g1.xml                    # Robot with <custom><text> motor and battery specs
 │   ├── scene.xml
-│   └── motors/
-│       ├── g1_7520_14.json      # Motor specs
-│       └── g1_5020_9.json
+│   ├── motors/
+│   │   ├── g1_7520_14.json      # Motor specs
+│   │   └── g1_5020_9.json
+│   └── batteries/
+│       └── g1_battery.json       # Battery specs
 ```
 
 Researchers can:
-1. Add motor specs to robot XMLs using `<custom><text>`
-2. Share XMLs via Menagerie
-3. Anyone loading the XML gets automatic electrical simulation
+1. Add motor and battery specs to robot XMLs using `<custom><text>`
+2. Share XMLs via Menagerie with complete electrical specifications
+3. Anyone loading the XML gets automatic electrical simulation with power constraints
+4. Battery voltage sag affects motor performance realistically
 
 ## Alternative Approaches (NOT Recommended)
 
@@ -219,11 +308,21 @@ Researchers can:
 
 ## Recommendation
 
-Use `<custom><text>` elements with the naming convention:
+Use `<custom><text>` elements with the naming conventions:
+
+**For motors:**
 - **Name**: `motor_{actuator_name}`
 - **Data**: `motor_spec:{motor_id}`
 
-This provides the cleanest, most compatible, and most maintainable solution for storing motor specifications in MuJoCo XML files.
+**For batteries:**
+- **Name**: `battery_{battery_name}`
+- **Data**: `battery_spec:{battery_id}`
+
+**For battery-entity mapping:**
+- **Name**: `battery_entity_{entity_name}`
+- **Data**: `battery:{battery_name}`
+
+This provides the cleanest, most compatible, and most maintainable solution for storing motor and battery specifications in MuJoCo XML files.
 
 ## Test Results
 
@@ -232,6 +331,8 @@ All tests pass with this approach:
 - ✅ Custom text preserved through roundtrips
 - ✅ Programmatic access works
 - ✅ Compatible with all actuator types
+- ✅ Compatible with battery specifications
 - ✅ Human-readable in XML
+- ✅ Supports scene-level battery management
 
-See `tests/test_motor_xml.py` for complete test suite.
+See `tests/test_motor_xml.py` and `tests/test_battery_database.py` for complete test suite.
