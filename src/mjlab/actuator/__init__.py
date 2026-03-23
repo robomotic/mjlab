@@ -41,6 +41,7 @@ from mjlab.actuator.electrical_motor_actuator import (
 from mjlab.actuator.electrical_motor_actuator import (
   ElectricalMotorActuatorCfg as ElectricalMotorActuatorCfg,
 )
+from mjlab.actuator.inverter import InverterCfg as InverterCfg
 from mjlab.actuator.learned_actuator import LearnedMlpActuator as LearnedMlpActuator
 from mjlab.actuator.learned_actuator import (
   LearnedMlpActuatorCfg as LearnedMlpActuatorCfg,

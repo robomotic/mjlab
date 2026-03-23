@@ -12,6 +12,7 @@ import mujoco_warp as mjwarp
 import numpy as np
 import torch
 
+from mjlab.battery import BatteryManager, BatteryManagerCfg
 from mjlab.entity import Entity, EntityCfg
 from mjlab.sensor import BuiltinSensor, RayCastSensor, Sensor, SensorCfg
 from mjlab.sensor.camera_sensor import CameraSensor
@@ -41,6 +42,9 @@ class SceneCfg:
   sensors: tuple[SensorCfg, ...] = field(default_factory=tuple)
   """Sensor configurations to attach to the scene."""
 
+  battery: BatteryManagerCfg | None = None
+  """Optional battery manager configuration for power-limited simulation."""
+
   extent: float | None = None
   """Override for ``mjModel.stat.extent``. If ``None``, MuJoCo computes
   it automatically."""
@@ -59,6 +63,7 @@ class Scene:
     self._terrain: TerrainEntity | None = None
     self._default_env_origins: torch.Tensor | None = None
     self._sensor_context: SensorContext | None = None
+    self._battery_manager: BatteryManager | None = None
 
     self._spec = mujoco.MjSpec.from_file(str(_SCENE_XML))
     if self._cfg.extent is not None:
@@ -68,6 +73,10 @@ class Scene:
     self._add_sensors()
     if self._cfg.spec_fn is not None:
       self._cfg.spec_fn(self._spec)
+
+    # Create battery manager after entities are added
+    if self._cfg.battery is not None:
+      self._battery_manager = BatteryManager(self._cfg.battery, self)
 
   def compile(self) -> mujoco.MjModel:
     return self._spec.compile()
@@ -196,21 +205,42 @@ class Scene:
         device=self._device,
       )
 
+    # Initialize battery manager
+    if self._battery_manager is not None:
+      self._battery_manager.initialize(self._cfg.num_envs, self._device)
+
   def reset(self, env_ids: torch.Tensor | slice | None = None) -> None:
     for ent in self._entities.values():
       ent.reset(env_ids)
     for sensor in self._sensors.values():
       sensor.reset(env_ids)
+    if self._battery_manager is not None:
+      self._battery_manager.reset(env_ids)
 
   def update(self, dt: float) -> None:
     for ent in self._entities.values():
       ent.update(dt)
     for sensor in self._sensors.values():
       sensor.update(dt)
+    if self._battery_manager is not None:
+      self._battery_manager.update(dt)
 
   def write_data_to_sim(self) -> None:
+    # 1. Compute battery voltage BEFORE actuators (if battery present)
+    if self._battery_manager is not None:
+      battery_voltage = self._battery_manager.compute_voltage()
+
+      # Feed voltage to electrical motor actuators
+      if self._battery_manager.cfg.enable_voltage_feedback:
+        self._update_actuator_voltage_limits(battery_voltage)
+
+    # 2. Apply actuator controls (actuators compute current draw)
     for ent in self._entities.values():
       ent.write_data_to_sim()
+
+    # 3. Aggregate current from actuators AFTER compute (if battery present)
+    if self._battery_manager is not None:
+      self._battery_manager.aggregate_current()
 
   # Private methods.
 
@@ -265,3 +295,26 @@ class Scene:
     for sns in self._spec.sensors:
       if sns.name not in self._sensors:
         self._sensors[sns.name] = BuiltinSensor.from_existing(sns.name)
+
+  def _update_actuator_voltage_limits(self, battery_voltage: torch.Tensor) -> None:
+    """Update actuator voltage limits based on battery state.
+
+    Args:
+        battery_voltage: Terminal voltage (V) for each environment, shape (num_envs,)
+    """
+    from mjlab.actuator import ElectricalMotorActuator
+
+    assert self._battery_manager is not None
+
+    for entity_name in self._battery_manager.cfg.entity_names:
+      if entity_name not in self._entities:
+        continue
+
+      entity = self._entities[entity_name]
+
+      for actuator in entity._actuators:
+        if isinstance(actuator, ElectricalMotorActuator):
+          assert actuator._voltage_max is not None
+          # Dynamically update voltage max (broadcast across joints)
+          # battery_voltage is (num_envs,), actuator._voltage_max is (num_envs, num_joints)
+          actuator._voltage_max[:] = battery_voltage.unsqueeze(1)

@@ -19,6 +19,7 @@ import torch
 
 from mjlab.actuator.actuator import ActuatorCmd
 from mjlab.actuator.dc_actuator import DcMotorActuator, DcMotorActuatorCfg
+from mjlab.actuator.inverter import InverterCfg
 from mjlab.motor_database import MotorSpecification
 
 if TYPE_CHECKING:
@@ -42,6 +43,11 @@ class ElectricalMotorActuatorCfg(DcMotorActuatorCfg):
 
   motor_spec: MotorSpecification
   """Motor specification with electrical/thermal/mechanical properties."""
+
+  inverter_cfg: InverterCfg | None = None
+  """Optional inverter configuration for AC motors (PMSM). When provided, models
+  DC-to-AC conversion losses for PMSM motors (like Unitree Go2/H1).
+  """
 
   def __post_init__(self) -> None:
     """Validate electrical motor parameters."""
@@ -246,7 +252,40 @@ class ElectricalMotorActuator(
     # 8. Actual torque from actual current
     effort_actual = self._motor_constant_kt * self.current
 
-    # 9. Apply DC motor torque-speed curve (parent class)
+    # 9. If inverter present, apply DC-to-AC conversion losses
+    if self.cfg.inverter_cfg is not None:
+      assert self.current is not None
+      assert self.voltage is not None
+
+      # Save AC-side current before modification
+      i_ac = self.current
+
+      # Compute load fraction: |I_motor| / I_stall
+      load_fraction = torch.abs(i_ac) / self.cfg.motor_spec.stall_current
+
+      # Get efficiency from inverter curve
+      efficiency = self.cfg.inverter_cfg.get_efficiency(
+        load_fraction, device=str(i_ac.device)
+      )
+
+      # DC-side current increased to account for inverter losses
+      # P_dc = P_ac / η  =>  I_dc = I_ac / η
+      # (assuming V_dc ≈ V_ac for power calculation)
+      self.current = i_ac / efficiency
+
+      # Additional power loss heats inverter (and motor)
+      # ΔP = P_dc - P_ac = P_ac * (1/η - 1)
+      # This adds to motor I²R losses
+      p_inverter_loss = self.voltage * torch.abs(i_ac) * (1.0 - efficiency)
+
+      # Add to power dissipation (affects thermal budget in update())
+      # Note: This is computed here but dissipation is updated in update()
+      # Store for later use
+      if not hasattr(self, "_inverter_loss"):
+        self._inverter_loss = torch.zeros_like(i_ac)
+      self._inverter_loss = p_inverter_loss
+
+    # 10. Apply DC motor torque-speed curve (parent class)
     # This calls _clip_effort() which applies torque-speed limiting
     return self._clip_effort(effort_actual)
 
@@ -266,6 +305,10 @@ class ElectricalMotorActuator(
 
     # Compute power dissipation (I²R)
     self.power_dissipation = self.current**2 * self._resistance
+
+    # Add inverter losses if present
+    if self.cfg.inverter_cfg is not None and hasattr(self, "_inverter_loss"):
+      self.power_dissipation = self.power_dissipation + self._inverter_loss
 
     # Thermal dynamics: dT/dt = (P_loss - (T-T_amb)/R_th) / τ_th
     heat_in = self.power_dissipation

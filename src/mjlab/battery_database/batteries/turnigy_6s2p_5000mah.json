@@ -1,0 +1,43 @@
+{
+  "battery_id": "turnigy_6s2p_5000mah",
+  "manufacturer": "Turnigy",
+  "model": "Graphene 5000mAh 6S2P 65C",
+  "chemistry": "LiPo",
+  "cells_series": 6,
+  "cells_parallel": 2,
+  "nominal_cell_voltage": 3.7,
+  "max_cell_voltage": 4.2,
+  "min_cell_voltage": 3.0,
+  "min_operating_voltage": 3.3,
+  "capacity_ah": 5.0,
+  "internal_resistance": 0.008,
+  "internal_resistance_temp_coeff": 0.0001,
+  "internal_resistance_soc_curve": [
+    [0.0, 2.5],
+    [0.2, 1.5],
+    [0.5, 1.0],
+    [1.0, 1.0]
+  ],
+  "max_continuous_current": 325.0,
+  "max_burst_current": 650.0,
+  "burst_duration": 10.0,
+  "c_rating_continuous": 65.0,
+  "c_rating_burst": 130.0,
+  "ocv_curve": [
+    [0.0, 3.0],
+    [0.2, 3.65],
+    [0.5, 3.75],
+    [0.8, 3.95],
+    [1.0, 4.2]
+  ],
+  "thermal_capacity": 800.0,
+  "thermal_resistance": 10.0,
+  "max_temperature": 60.0,
+  "min_temperature": -10.0,
+  "ambient_temperature": 25.0,
+  "min_soc": 0.2,
+  "max_soc": 1.0,
+  "mass_kg": 0.475,
+  "volume_liters": 0.25,
+  "cell_balance_tolerance": 0.05
+}
