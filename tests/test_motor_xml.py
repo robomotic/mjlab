@@ -437,6 +437,124 @@ def test_no_custom_section():
   assert len(motor_specs) == 0
 
 
+def test_g1_robot_with_motor_specs():
+  """Test adding motor specs to real G1 Unitree robot model."""
+  # Simplified G1 XML with key actuators
+  g1_xml = """
+    <mujoco model="g1_29dof">
+      <compiler angle="radian"/>
+      <option timestep=".004"/>
+
+      <worldbody>
+        <body name="pelvis" pos="0 0 0.793">
+          <freejoint name="floating_base_joint"/>
+          <geom type="sphere" size="0.07"/>
+
+          <body name="left_hip_pitch_link">
+            <joint name="left_hip_pitch_joint" type="hinge" axis="0 1 0"/>
+            <geom type="sphere" size="0.05"/>
+
+            <body name="left_hip_roll_link">
+              <joint name="left_hip_roll_joint" type="hinge" axis="1 0 0"/>
+              <geom type="sphere" size="0.05"/>
+
+              <body name="left_hip_yaw_link">
+                <joint name="left_hip_yaw_joint" type="hinge" axis="0 0 1"/>
+                <geom type="sphere" size="0.05"/>
+
+                <body name="left_knee_link">
+                  <joint name="left_knee_joint" type="hinge" axis="0 1 0"/>
+                  <geom type="sphere" size="0.04"/>
+
+                  <body name="left_ankle_pitch_link">
+                    <joint name="left_ankle_pitch_joint" type="hinge"
+                           axis="0 1 0"/>
+                    <geom type="sphere" size="0.03"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+
+          <body name="left_shoulder_pitch_link">
+            <joint name="left_shoulder_pitch_joint" type="hinge"
+                   axis="0 1 0"/>
+            <geom type="sphere" size="0.04"/>
+
+            <body name="left_elbow_link">
+              <joint name="left_elbow_joint" type="hinge" axis="0 1 0"/>
+              <geom type="sphere" size="0.03"/>
+            </body>
+          </body>
+        </body>
+      </worldbody>
+
+      <actuator>
+        <position name="left_hip_pitch_joint" joint="left_hip_pitch_joint"
+                  kp="75"/>
+        <position name="left_hip_roll_joint" joint="left_hip_roll_joint"
+                  kp="75"/>
+        <position name="left_hip_yaw_joint" joint="left_hip_yaw_joint"
+                  kp="75"/>
+        <position name="left_knee_joint" joint="left_knee_joint" kp="75"/>
+        <position name="left_ankle_pitch_joint"
+                  joint="left_ankle_pitch_joint" kp="20"/>
+        <position name="left_shoulder_pitch_joint"
+                  joint="left_shoulder_pitch_joint" kp="75"/>
+        <position name="left_elbow_joint" joint="left_elbow_joint" kp="75"/>
+      </actuator>
+    </mujoco>
+    """
+
+  # Load G1 spec
+  spec = mujoco.MjSpec.from_string(g1_xml)
+
+  # Add motor specs for different joint types
+  # Hip joints: High-torque motors (88 N⋅m)
+  write_motor_spec_to_xml(spec, "left_hip_pitch_joint", "unitree_7520_14")
+  write_motor_spec_to_xml(spec, "left_hip_roll_joint", "unitree_7520_14")
+  write_motor_spec_to_xml(spec, "left_hip_yaw_joint", "unitree_7520_14")
+
+  # Knee joint: High-torque motor (88 N⋅m)
+  write_motor_spec_to_xml(spec, "left_knee_joint", "unitree_7520_14")
+
+  # Ankle joint: Mid-range motor (25 N⋅m)
+  write_motor_spec_to_xml(spec, "left_ankle_pitch_joint", "unitree_5020_9")
+
+  # Arm joints: Mid-range motors (25 N⋅m)
+  write_motor_spec_to_xml(spec, "left_shoulder_pitch_joint", "unitree_5020_9")
+  write_motor_spec_to_xml(spec, "left_elbow_joint", "unitree_5020_9")
+
+  # Parse back motor specs
+  motor_specs = parse_motor_specs_from_xml(spec)
+
+  # Verify all 7 motor specs were added
+  assert len(motor_specs) == 7
+  assert motor_specs["left_hip_pitch_joint"] == "unitree_7520_14"
+  assert motor_specs["left_hip_roll_joint"] == "unitree_7520_14"
+  assert motor_specs["left_hip_yaw_joint"] == "unitree_7520_14"
+  assert motor_specs["left_knee_joint"] == "unitree_7520_14"
+  assert motor_specs["left_ankle_pitch_joint"] == "unitree_5020_9"
+  assert motor_specs["left_shoulder_pitch_joint"] == "unitree_5020_9"
+  assert motor_specs["left_elbow_joint"] == "unitree_5020_9"
+
+  # Verify model compiles with motor specs
+  model = spec.compile()
+  assert model is not None
+  assert model.nu == 7  # 7 actuators
+
+  # Write to XML and verify roundtrip
+  xml_output = spec.to_xml()
+  assert "motor_left_hip_pitch_joint" in xml_output
+  assert "motor_spec:unitree_7520_14" in xml_output
+  assert "motor_spec:unitree_5020_9" in xml_output
+
+  # Load from XML string and verify motor specs preserved
+  spec2 = mujoco.MjSpec.from_string(xml_output)
+  motor_specs2 = parse_motor_specs_from_xml(spec2)
+  assert motor_specs == motor_specs2
+
+
 if __name__ == "__main__":
   # Run tests manually for quick verification
   print("Testing MuJoCo motor_spec XML integration...\n")
@@ -482,5 +600,8 @@ if __name__ == "__main__":
 
   test_no_custom_section()
   print("✓ No custom section works")
+
+  test_g1_robot_with_motor_specs()
+  print("✓ G1 robot with motor specs works")
 
   print("\n✅ All motor_spec XML integration tests passed!")
