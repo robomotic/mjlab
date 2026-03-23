@@ -35,6 +35,12 @@ from mjlab.actuator.delayed_actuator import DelayedActuatorCfg as DelayedActuato
 from mjlab.actuator.delayed_builtin_group import (
   DelayedBuiltinActuatorGroup as DelayedBuiltinActuatorGroup,
 )
+from mjlab.actuator.electrical_motor_actuator import (
+  ElectricalMotorActuator as ElectricalMotorActuator,
+)
+from mjlab.actuator.electrical_motor_actuator import (
+  ElectricalMotorActuatorCfg as ElectricalMotorActuatorCfg,
+)
 from mjlab.actuator.learned_actuator import LearnedMlpActuator as LearnedMlpActuator
 from mjlab.actuator.learned_actuator import (
   LearnedMlpActuatorCfg as LearnedMlpActuatorCfg,
