@@ -941,6 +941,185 @@ uv run pytest tests/test_electrical_motor_actuator.py -v
 uv run pytest tests/test_electrical_motor_actuator.py::test_current_response_time -v
 ```
 
+**Status**: ✅ **COMPLETED** (13 tests passing, tagged as phase2-core and phase2-tests)
+
+### Phase 2 (B): Battery System and Power Management
+
+**Goal**: Add comprehensive battery modeling to enable power-limited robotic simulations with realistic voltage sag, state-of-charge tracking, and thermal dynamics.
+
+**Motivation**: While the ElectricalMotorActuator accurately models individual motor electrical dynamics, there is no battery system to:
+- Track total power consumption across multiple motors
+- Model realistic voltage drop under load (voltage sag from internal resistance)
+- Simulate battery discharge and state-of-charge (SOC) evolution
+- Limit motor performance when battery voltage drops
+- Model inverter efficiency for AC motors (PMSM like in Go2/H1 robots)
+
+**Tasks**:
+1. Design and implement `BatterySpecification` dataclass
+   - Support LiPo, LiFePO4, Li-ion chemistries
+   - Cell configuration (series/parallel)
+   - Open-circuit voltage (OCV) curves
+   - Internal resistance (SOC and temperature dependent)
+   - Thermal properties
+
+2. Implement battery database infrastructure
+   - `load_battery_spec()` with flexible path resolution (follows motor database pattern)
+   - Search paths: ~/.mjlab/batteries/, ./batteries/, MJLAB_BATTERY_PATH, built-in
+   - XML integration for storing battery specs in MuJoCo files
+   - Example battery JSON files (LiPo, LiFePO4, test)
+
+3. Implement `BatteryManager` (scene-level power management)
+   - Voltage drop physics: V_terminal = V_oc(SOC) - I*R(SOC,T)
+   - State-of-charge tracking: dSOC/dt = -I/(Q*3600)
+   - Thermal dynamics: dT/dt = (I²R - (T-T_amb)/R_th) / τ_th
+   - Current aggregation from all electrical motor actuators
+   - Per-environment state tracking (num_envs tensors)
+
+4. Integrate with Scene
+   - Add `BatteryManagerCfg` to `SceneCfg`
+   - Three-step workflow: compute_voltage() → update motor limits → aggregate_current()
+   - Dynamic voltage feedback to motors (battery voltage limits motor performance)
+
+5. Implement inverter support for PMSM motors
+   - `InverterCfg` with load-dependent efficiency curves
+   - DC-to-AC conversion loss modeling: I_dc = I_ac / efficiency
+   - Integrate into `ElectricalMotorActuator`
+   - Additional power loss added to thermal budget
+
+6. Write comprehensive tests:
+   - Battery database tests (~19 tests): JSON loading, path resolution, XML integration
+   - Battery manager tests (~24 tests): voltage drop, SOC, thermal, resistance
+   - All existing motor tests continue to pass (~13 tests)
+
+**Deliverables**:
+- `src/mjlab/battery_database/battery_spec.py` (163 lines)
+- `src/mjlab/battery_database/database.py` (207 lines)
+- `src/mjlab/battery_database/xml_integration.py` (120 lines)
+- `src/mjlab/battery_database/__init__.py`
+- `src/mjlab/battery_database/batteries/*.json` (3 example batteries)
+- `src/mjlab/battery/battery_manager.py` (380 lines)
+- `src/mjlab/battery/__init__.py`
+- `src/mjlab/actuator/inverter.py` (100 lines)
+- `src/mjlab/scene/scene.py` (modified for battery integration)
+- `src/mjlab/actuator/electrical_motor_actuator.py` (modified for inverter support)
+- `tests/test_battery_database.py` (498 lines, 19 tests)
+- `tests/test_battery_manager.py` (512 lines, 24 tests)
+
+**Battery Physics Modeled**:
+
+1. **Voltage Drop Model**:
+   ```
+   V_terminal = V_oc(SOC) - I * R_internal(SOC, T)
+
+   V_oc(SOC) = interpolate(ocv_curve, SOC)
+   R_internal(SOC, T) = R_base * f(SOC) * (1 + α·ΔT)
+   ```
+
+2. **State of Charge**:
+   ```
+   dSOC/dt = -I / (Q_capacity * 3600)
+   SOC ∈ [min_soc, max_soc]  # Clamped to protect battery
+   ```
+
+3. **Thermal Dynamics** (matching motor thermal pattern):
+   ```
+   P_loss = I² * R_internal
+   dT/dt = (P_loss - (T - T_amb) / R_th) / τ_th
+   ```
+
+4. **Cell Configuration Physics**:
+   ```
+   Series (6S):   V_pack = 6 * V_cell,  R_pack = 6 * R_cell
+   Parallel (2P): Q_pack = 2 * Q_cell,  I_cell = I_pack / 2
+   Combined (6S2P): V = 6*V_cell, Q = 2*Q_cell, R = 6*R_cell/2
+   ```
+
+**Inverter Model** (for PMSM motors):
+- Load-dependent efficiency curve (50% at no load, 92% at 50% load, 90% at full load)
+- DC-side current increased: I_dc = I_ac / η
+- Additional power loss: ΔP = P_ac * (1/η - 1)
+- Integrated into ElectricalMotorActuator with optional `inverter_cfg`
+
+**Example Usage**:
+```python
+from mjlab.battery import BatteryManagerCfg
+from mjlab.battery_database import load_battery_spec
+from mjlab.actuator import ElectricalMotorActuatorCfg, InverterCfg
+from mjlab.motor_database import load_motor_spec
+from mjlab.scene import SceneCfg
+
+# Load specifications
+motor = load_motor_spec("unitree_7520_14")
+battery = load_battery_spec("turnigy_6s2p_5000mah")
+
+# Configure inverter for PMSM motors (Go2/H1 style)
+inverter = InverterCfg(
+    efficiency_curve=[
+        (0.0, 0.5),   # 50% at no load
+        (0.2, 0.85),  # 85% at 20% load
+        (0.5, 0.92),  # 92% at 50% load (peak)
+        (0.7, 0.93),  # 93% at 70% load
+        (1.0, 0.90),  # 90% at full load
+    ]
+)
+
+# Configure scene with battery and inverter-driven motors
+scene_cfg = SceneCfg(
+    num_envs=4,
+    entities={
+        "robot": EntityCfg(
+            articulation=EntityArticulationInfoCfg(
+                actuators=(
+                    ElectricalMotorActuatorCfg(
+                        target_names_expr=(".*_hip_.*",),
+                        motor_spec=motor,
+                        inverter_cfg=inverter,  # PMSM with DC-to-AC conversion
+                    ),
+                )
+            )
+        )
+    },
+    battery=BatteryManagerCfg(
+        battery_spec=battery,
+        entity_names=("robot",),
+        initial_soc=1.0,
+        enable_voltage_feedback=True,
+    )
+)
+
+# Battery state automatically tracked during simulation:
+# - SOC decreases with current draw
+# - Voltage sags under load (realistic power constraints)
+# - Motor performance limited by battery voltage
+# - Temperature rises with I²R losses
+# - Inverter losses increase DC-side current
+```
+
+**Validation**:
+```bash
+# Battery database tests (19 tests)
+uv run pytest tests/test_battery_database.py -v
+
+# Battery manager physics tests (24 tests)
+uv run pytest tests/test_battery_manager.py -v
+
+# All tests together (56 tests: 19 + 24 + 13 motor tests)
+uv run pytest tests/test_battery_database.py tests/test_battery_manager.py tests/test_electrical_motor_actuator.py -v
+
+# Type checking and formatting
+make check
+```
+
+**Key Design Decisions**:
+
+1. **Scene-Level Battery Manager**: Battery is shared across all actuators (realistic), managed at Scene level for aggregation
+2. **Dynamic Voltage Limits**: Battery voltage dynamically updates motor voltage limits per-step
+3. **OCV Curves**: Non-linear voltage curves for different chemistries (LiPo vs LiFePO4 have different discharge characteristics)
+4. **SOC-Dependent Resistance**: R increases 2.5x at empty vs full charge (realistic voltage sag at low SOC)
+5. **Inverter Efficiency**: Models DC-to-AC conversion for PMSM motors with load-dependent losses
+
+**Status**: ✅ **COMPLETED** (43 tests passing: 19 database + 24 manager, tagged as phase2-b)
+
 ### Phase 3: Integration
 
 **Goal**: Integrate with metrics system and create examples
