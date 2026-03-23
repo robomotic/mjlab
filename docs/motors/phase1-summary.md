@@ -70,9 +70,9 @@ Exports:
 ### 6. Comprehensive Tests
 **Files**:
 - [tests/test_motor_database.py](../tests/test_motor_database.py) - 18 database tests
-- [tests/test_motor_xml.py](../tests/test_motor_xml.py) - 14 XML integration tests
+- [tests/test_motor_xml.py](../tests/test_motor_xml.py) - 15 XML integration tests
 
-32 unit tests covering:
+33 unit tests covering:
 - Motor spec creation and defaults
 - JSON serialization round-trips
 - Built-in motor loading
@@ -86,6 +86,8 @@ Exports:
 - Multiple actuators with motor specs
 
 ## Usage Examples
+
+### Loading Motor Specifications
 
 ```python
 from mjlab.motor_database import load_motor_spec, add_motor_database_path
@@ -106,6 +108,76 @@ motor = load_motor_spec("custom_motor_123")
 motor = load_motor_spec(url="https://example.com/motor.json")
 ```
 
+### XML Integration with Unitree G1 Robot
+
+The XML integration allows storing motor specifications directly in MuJoCo XML files. Here's an example from the G1 humanoid robot test:
+
+```python
+import mujoco
+from mjlab.motor_database import write_motor_spec_to_xml
+
+# Load robot XML
+spec = mujoco.MjSpec.from_file("unitree_g1.xml")
+
+# Add motor specs to leg actuators (high-torque motors)
+write_motor_spec_to_xml(spec, "left_hip_pitch_joint", "unitree_7520_14")
+write_motor_spec_to_xml(spec, "left_hip_roll_joint", "unitree_7520_14")
+write_motor_spec_to_xml(spec, "left_knee_joint", "unitree_7520_14")
+
+# Add motor specs to ankle (mid-range motor)
+write_motor_spec_to_xml(spec, "left_ankle_pitch_joint", "unitree_5020_9")
+
+# Save modified XML
+xml_output = spec.to_xml()
+```
+
+**Resulting XML structure:**
+
+```xml
+<mujoco model="g1_29dof">
+  <actuator>
+    <position name="left_hip_pitch_joint" joint="left_hip_pitch_joint" kp="75"/>
+    <position name="left_hip_roll_joint" joint="left_hip_roll_joint" kp="75"/>
+    <position name="left_hip_yaw_joint" joint="left_hip_yaw_joint" kp="75"/>
+    <position name="left_knee_joint" joint="left_knee_joint" kp="75"/>
+    <position name="left_ankle_pitch_joint" joint="left_ankle_pitch_joint" kp="20"/>
+  </actuator>
+
+  <!-- Motor specifications stored as custom text data -->
+  <custom>
+    <text name="motor_left_hip_pitch_joint" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_left_hip_roll_joint" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_left_hip_yaw_joint" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_left_knee_joint" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_left_ankle_pitch_joint" data="motor_spec:unitree_5020_9"/>
+  </custom>
+</mujoco>
+```
+
+**Key features:**
+- ✅ Standard MuJoCo loads this XML without errors
+- ✅ Motor specs are preserved through XML write/read cycles
+- ✅ Ready for sharing via MuJoCo Menagerie
+- ✅ Phase 2 will auto-detect and create electrical actuators from these specs
+
+**Reading motor specs from XML:**
+
+```python
+from mjlab.motor_database import parse_motor_specs_from_xml, load_motor_spec
+
+# Load robot XML with motor specs
+spec = mujoco.MjSpec.from_file("unitree_g1_with_motors.xml")
+
+# Parse all motor specs
+motor_specs = parse_motor_specs_from_xml(spec)
+# Returns: {'left_hip_pitch_joint': 'unitree_7520_14', ...}
+
+# Load actual motor data
+for actuator_name, motor_id in motor_specs.items():
+    motor = load_motor_spec(motor_id)
+    print(f"{actuator_name}: {motor.continuous_torque} N⋅m")
+```
+
 ## Verification
 
 All deliverables verified:
@@ -113,7 +185,7 @@ All deliverables verified:
 - ✅ JSON files valid
 - ✅ Python syntax correct
 - ✅ Line length < 88 chars
-- ✅ 32 tests implemented (18 database + 14 XML)
+- ✅ 33 tests implemented (18 database + 15 XML including G1 robot test)
 - ✅ All tests passing
 - ✅ No external dependencies added
 - ✅ XML integration fully functional
@@ -178,7 +250,7 @@ Total: ~1,762 lines of code
 - ✅ Database loader with flexible path resolution
 - ✅ XML integration for MuJoCo backward compatibility
 - ✅ 3 example motor JSON specifications
-- ✅ 32 unit tests (18 database + 14 XML)
+- ✅ 33 unit tests (18 database + 15 XML)
 - ✅ Type-safe, well-documented code
 - ✅ No external dependencies
 - ✅ Follows mjlab patterns and conventions
