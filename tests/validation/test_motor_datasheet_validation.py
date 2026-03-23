@@ -4,7 +4,6 @@ These tests validate that motor specifications match manufacturer datasheets
 and that the electrical/mechanical models produce expected behavior.
 """
 
-import pytest
 import torch
 
 from mjlab.motor_database import load_motor_spec
@@ -113,8 +112,8 @@ def test_torque_speed_curve_unitree_7520_14():
     # Calculate torque using motor equations with gearing
     V = motor.voltage_range[1]  # Max voltage
     omega_motor = omega_out.item() * motor.gear_ratio
-    I = (V - motor.motor_constant_ke * omega_motor) / motor.resistance
-    tau_motor = motor.motor_constant_kt * I
+    current = (V - motor.motor_constant_ke * omega_motor) / motor.resistance
+    tau_motor = motor.motor_constant_kt * current
     calculated_torque = tau_motor * motor.gear_ratio
 
     # Torque should decrease monotonically with speed
@@ -127,14 +126,14 @@ def test_torque_speed_curve_unitree_7520_14():
   # Check boundary conditions are reasonable
   # At zero speed: should have high torque
   V = motor.voltage_range[1]
-  I_stall = V / motor.resistance
-  tau_stall = motor.motor_constant_kt * I_stall * motor.gear_ratio
+  current_stall = V / motor.resistance
+  tau_stall = motor.motor_constant_kt * current_stall * motor.gear_ratio
   assert tau_stall > motor.stall_torque * 0.1, "Stall torque too low"
 
   # At no-load speed: torque magnitude should be less than 3x stall (back-EMF dominates)
   omega_motor_noload = motor.no_load_speed * motor.gear_ratio
-  I_noload = (V - motor.motor_constant_ke * omega_motor_noload) / motor.resistance
-  tau_noload = motor.motor_constant_kt * I_noload * motor.gear_ratio
+  current_noload = (V - motor.motor_constant_ke * omega_motor_noload) / motor.resistance
+  tau_noload = motor.motor_constant_kt * current_noload * motor.gear_ratio
   assert abs(tau_noload) < motor.stall_torque * 3, "No-load torque unreasonably high"
 
 
@@ -174,15 +173,15 @@ def test_power_consistency_unitree_7520_14():
   V = motor.voltage_range[1]
 
   # Electrical side
-  I = (V - motor.motor_constant_ke * omega) / motor.resistance
-  P_elec = V * I
+  current = (V - motor.motor_constant_ke * omega) / motor.resistance
+  P_elec = V * current
 
   # Mechanical side
-  tau = motor.motor_constant_kt * I
+  tau = motor.motor_constant_kt * current
   P_mech = tau * omega
 
   # Losses
-  P_copper = I**2 * motor.resistance
+  P_copper = current**2 * motor.resistance
   P_losses = P_copper  # Simplified (ignoring friction, iron losses)
 
   # Power balance: P_elec = P_mech + P_losses

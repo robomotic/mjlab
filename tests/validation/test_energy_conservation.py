@@ -9,8 +9,8 @@ These tests validate that energy is conserved throughout the simulation:
 import mujoco
 import pytest
 import torch
-
 from conftest import get_test_device, initialize_entity, load_fixture_xml
+
 from mjlab.actuator import ElectricalMotorActuatorCfg
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.motor_database import MotorSpecification
@@ -103,8 +103,8 @@ def test_instantaneous_power_balance(robot_xml, test_motor_spec):
   actuator = entity._actuators[0]
 
   # Electrical power: P_elec = V * I
-  voltage = actuator.voltage[0].mean().item()
-  current = actuator.current[0].mean().item()
+  voltage = actuator.voltage[0].mean().item()  # type: ignore[attr-defined]
+  current = actuator.current[0].mean().item()  # type: ignore[attr-defined]
   P_elec = abs(voltage * current)  # Absolute value for power magnitude
 
   # Copper losses: P_copper = I² * R
@@ -127,10 +127,10 @@ def test_instantaneous_power_balance(robot_xml, test_motor_spec):
     f"  P_elec should be >= P_copper"
   )
 
-  print(f"\nInstantaneous Power Check:")
+  print("\nInstantaneous Power Check:")
   print(f"  P_elec = {P_elec:.4f}W")
   print(f"  P_copper = {P_copper:.4f}W")
-  print(f"  ✓ Energy conservation validated")
+  print("  ✓ Energy conservation validated")
 
 
 def test_energy_conservation_over_trajectory(robot_xml, test_motor_spec):
@@ -185,8 +185,8 @@ def test_energy_conservation_over_trajectory(robot_xml, test_motor_spec):
     entity.update(dt)
 
     # Accumulate energies
-    voltage = actuator.voltage[0].mean().item()
-    current = actuator.current[0].mean().item()
+    voltage = actuator.voltage[0].mean().item()  # type: ignore[attr-defined]
+    current = actuator.current[0].mean().item()  # type: ignore[attr-defined]
     velocity = entity._data.joint_vel[0].mean().item()
 
     # Energy increments (Power * dt)
@@ -207,7 +207,7 @@ def test_energy_conservation_over_trajectory(robot_xml, test_motor_spec):
   # Allow 15% tolerance for numerical integration, other losses
   tolerance = 0.15 * max(abs(E_electrical), abs(E_total))
 
-  print(f"\nEnergy Conservation Over Trajectory:")
+  print("\nEnergy Conservation Over Trajectory:")
   print(f"  E_electrical = {E_electrical:.4f}J")
   print(f"  E_mechanical = {E_mechanical:.4f}J")
   print(f"  E_heat       = {E_heat:.4f}J")
@@ -263,17 +263,17 @@ def test_heat_dissipation_accumulation(robot_xml, test_motor_spec):
   dt = 0.002
   num_steps = 500
 
-  initial_temp = actuator.winding_temperature[0].mean().item()
+  initial_temp = actuator.winding_temperature[0].mean().item()  # type: ignore[attr-defined]
 
   for _ in range(num_steps):
     entity.set_joint_position_target(target)
     entity.write_data_to_sim()
     entity.update(dt)
 
-    current = actuator.current[0].mean().item()
+    current = actuator.current[0].mean().item()  # type: ignore[attr-defined]
     Q_accumulated += current**2 * R * dt
 
-  final_temp = actuator.winding_temperature[0].mean().item()
+  final_temp = actuator.winding_temperature[0].mean().item()  # type: ignore[attr-defined]
   delta_T = final_temp - initial_temp
 
   # Expected temperature rise (steady-state approximation)
@@ -281,7 +281,7 @@ def test_heat_dissipation_accumulation(robot_xml, test_motor_spec):
   avg_power = Q_accumulated / (num_steps * dt)  # Average power
   expected_delta_T = avg_power * R_th
 
-  print(f"\nHeat Dissipation Test:")
+  print("\nHeat Dissipation Test:")
   print(f"  Heat accumulated: {Q_accumulated:.4f}J")
   print(f"  Avg power: {avg_power:.4f}W")
   print(f"  Initial temp: {initial_temp:.2f}°C")
@@ -347,7 +347,7 @@ def test_regenerative_braking_energy(robot_xml, test_motor_spec):
     entity.update(dt)
 
     velocity = entity._data.joint_vel[0].mean().item()
-    current = actuator.current[0].mean().item()
+    current = actuator.current[0].mean().item()  # type: ignore[attr-defined]
 
     # During braking: velocity > 0, current should be negative (regenerative)
     # Estimate torque from motor equations: τ = Kt * I * N
@@ -362,7 +362,7 @@ def test_regenerative_braking_energy(robot_xml, test_motor_spec):
   if len(braking_samples) > 5:
     avg_P_mech = sum(sample[3] for sample in braking_samples) / len(braking_samples)
 
-    print(f"\nRegenerative Braking:")
+    print("\nRegenerative Braking:")
     print(f"  Samples: {len(braking_samples)}")
     print(f"  Avg P_mech: {avg_P_mech:.4f}W")
 
@@ -428,7 +428,7 @@ def test_no_free_energy(robot_xml, test_motor_spec):
   final_velocity = entity._data.joint_vel[0].mean().item()
   final_KE = 0.5 * test_motor_spec.reflected_inertia * final_velocity**2
 
-  print(f"\nNo Free Energy Test:")
+  print("\nNo Free Energy Test:")
   print(f"  Initial KE: {initial_KE:.6f}J")
   print(f"  Final KE: {final_KE:.6f}J")
   print(f"  Change: {final_KE - initial_KE:.6f}J")

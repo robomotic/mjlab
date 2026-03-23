@@ -2,12 +2,10 @@
 
 import mujoco
 import pytest
+from conftest import get_test_device, initialize_entity
 
 from mjlab.entity import Entity, EntityCfg
 from mjlab.scene import Scene, SceneCfg
-
-from conftest import get_test_device, initialize_entity
-
 
 device = get_test_device()
 
@@ -81,7 +79,10 @@ def xml_no_specs():
 
 def test_auto_discover_motors_from_xml(xml_with_motor_specs):
   """Test auto-discovery of motors from XML."""
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_motor_specs)
+
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_motor_specs)
+
   cfg = EntityCfg(spec_fn=spec_fn, auto_discover_motors=True)
   entity = Entity(cfg)
 
@@ -96,7 +97,10 @@ def test_auto_discover_motors_from_xml(xml_with_motor_specs):
 
 def test_auto_discover_multiple_motor_types(xml_with_motor_specs):
   """Test auto-discovery groups motors by type."""
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_motor_specs)
+
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_motor_specs)
+
   cfg = EntityCfg(spec_fn=spec_fn, auto_discover_motors=True)
   entity = Entity(cfg)
 
@@ -106,14 +110,18 @@ def test_auto_discover_multiple_motor_types(xml_with_motor_specs):
 
   # Verify motor specs are correct
   actuator_cfgs = entity.cfg.articulation.actuators
-  motor_ids = {cfg.motor_spec.motor_id for cfg in actuator_cfgs}
+  assert actuator_cfgs is not None
+  motor_ids = {cfg.motor_spec.motor_id for cfg in actuator_cfgs}  # type: ignore[union-attr]
   assert "unitree_7520_14" in motor_ids
   assert "unitree_5020_9" in motor_ids
 
 
 def test_auto_discover_motors_disabled(xml_with_motor_specs):
   """Test auto-discovery can be disabled."""
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_motor_specs)
+
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_motor_specs)
+
   cfg = EntityCfg(spec_fn=spec_fn, auto_discover_motors=False)
   entity = Entity(cfg)
 
@@ -123,7 +131,10 @@ def test_auto_discover_motors_disabled(xml_with_motor_specs):
 
 def test_auto_discover_battery_from_xml(xml_with_battery_spec):
   """Test auto-discovery of battery from XML."""
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_battery_spec)
+
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_battery_spec)
+
   scene_cfg = SceneCfg(
     num_envs=1, entities={"robot": EntityCfg(spec_fn=spec_fn)}, auto_battery=True
   )
@@ -139,7 +150,8 @@ def test_manual_config_takes_precedence(xml_with_motor_specs):
   from mjlab.actuator import BuiltinPositionActuatorCfg
   from mjlab.entity import EntityArticulationInfoCfg
 
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_motor_specs)
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_motor_specs)
 
   # Provide explicit articulation config
   manual_actuator = BuiltinPositionActuatorCfg(
@@ -153,13 +165,16 @@ def test_manual_config_takes_precedence(xml_with_motor_specs):
   entity = Entity(cfg)
 
   # Should use manual config, not auto-discovered motors
+  assert entity.cfg.articulation is not None
   assert entity.cfg.articulation.actuators == (manual_actuator,)
   assert len(entity.cfg.articulation.actuators) == 1
 
 
 def test_no_specs_in_xml(xml_no_specs):
   """Test graceful handling when no specs are present."""
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_no_specs)
+
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_no_specs)
 
   # Entity with auto-discovery enabled but no specs in XML
   cfg = EntityCfg(spec_fn=spec_fn, auto_discover_motors=True)
@@ -183,7 +198,8 @@ def test_battery_manual_config_precedence(xml_with_battery_spec):
   from mjlab.battery import BatteryManagerCfg
   from mjlab.battery_database import load_battery_spec
 
-  spec_fn = lambda: mujoco.MjSpec.from_string(xml_with_battery_spec)
+  def spec_fn():
+    return mujoco.MjSpec.from_string(xml_with_battery_spec)
 
   # Provide explicit battery config (different from XML)
   manual_battery_cfg = BatteryManagerCfg(

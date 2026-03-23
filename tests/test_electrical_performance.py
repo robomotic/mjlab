@@ -8,9 +8,8 @@ import time
 
 import mujoco
 import pytest
-import torch
-
 from conftest import get_test_device, initialize_entity, load_fixture_xml
+
 from mjlab.actuator import DcMotorActuatorCfg, ElectricalMotorActuatorCfg
 from mjlab.entity import Entity, EntityArticulationInfoCfg, EntityCfg
 from mjlab.motor_database import MotorSpecification
@@ -208,7 +207,7 @@ def test_memory_footprint(robot_xml, simple_motor_spec):
 
   # Get memory stats (requires CUDA)
   try:
-    import pynvml
+    import pynvml  # type: ignore[import-not-found]
 
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(0)
