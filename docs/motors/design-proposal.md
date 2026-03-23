@@ -649,7 +649,75 @@ actuator_cfg = ElectricalMotorActuatorCfg(
 )
 ```
 
-#### 3. MJCF Integration
+#### 3. XML Integration (Phase 1)
+
+**Location**: `src/mjlab/motor_database/xml_integration.py`
+
+**Purpose**: Enable storing and reading motor_spec references in MuJoCo XML files for sharing via MuJoCo Menagerie.
+
+**Storage Format**: Uses MuJoCo's `<custom><text>` mechanism (official feature, backward compatible):
+
+```xml
+<mujoco model="unitree_g1">
+  <actuator>
+    <motor name="left_hip_motor" joint="left_hip_joint" gear="14.5"/>
+    <motor name="right_hip_motor" joint="right_hip_joint" gear="14.5"/>
+  </actuator>
+
+  <!-- Motor specifications stored as custom text data -->
+  <custom>
+    <text name="motor_left_hip_motor" data="motor_spec:unitree_7520_14"/>
+    <text name="motor_right_hip_motor" data="motor_spec:unitree_7520_14"/>
+  </custom>
+</mujoco>
+```
+
+**API Functions**:
+
+```python
+from mjlab.motor_database import (
+    write_motor_spec_to_xml,
+    parse_motor_specs_from_xml,
+    get_motor_spec,
+    has_motor_spec,
+)
+
+# Writing motor specs to XML
+spec = mujoco.MjSpec.from_file("robot.xml")
+write_motor_spec_to_xml(spec, "left_hip_motor", "unitree_7520_14")
+xml_output = spec.to_xml()  # Contains motor_spec in <custom><text>
+
+# Reading motor specs from XML
+spec = mujoco.MjSpec.from_file("robot_with_motors.xml")
+motor_specs = parse_motor_specs_from_xml(spec)
+# {'left_hip_motor': 'unitree_7520_14', ...}
+
+# Query individual actuators
+if has_motor_spec(spec, "left_hip_motor"):
+    motor_id = get_motor_spec(spec, "left_hip_motor")
+    motor = load_motor_spec(motor_id)
+```
+
+**Benefits**:
+- ✅ **Backward compatible**: Standard MuJoCo loads XMLs without errors
+- ✅ **Preserves through roundtrips**: XML write/read cycles maintain motor_spec
+- ✅ **MuJoCo Menagerie ready**: Share robot XMLs with motor specifications
+- ✅ **Auto-loading** (Phase 2): mjlab can auto-detect and create electrical actuators
+
+**Why `<custom><text>` and not attributes?**
+
+MuJoCo strictly validates XML schema and rejects unknown attributes:
+```xml
+<!-- ❌ This BREAKS - MuJoCo rejects it -->
+<motor name="motor1" joint="joint1" motor_spec="unitree_7520_14"/>
+
+<!-- ✅ This WORKS - official MuJoCo feature -->
+<custom>
+  <text name="motor_motor1" data="motor_spec:unitree_7520_14"/>
+</custom>
+```
+
+#### 4. MJCF Integration (Phase 2)
 
 **Approach**: Motors are referenced in the actuator configuration (Python-side), not directly in MJCF.
 
@@ -674,7 +742,7 @@ def edit_spec(self, spec: mujoco.MjSpec, target_names: list[str]) -> None:
         self._mjs_actuators.append(actuator)
 ```
 
-#### 4. Electrical Metrics
+#### 5. Electrical Metrics
 
 **Location**: `src/mjlab/metrics/electrical_metrics.py`
 
@@ -733,7 +801,7 @@ class TotalEnergyTerm(MetricsTerm):
             self._cumulative_energy[env_ids] = 0.0
 ```
 
-#### 5. Documentation & Examples
+#### 6. Documentation & Examples
 
 **Documentation Updates**:
 - Add "Motor Database" section to `docs/source/actuators.rst`
@@ -816,30 +884,36 @@ for _ in range(1000):
 
 ## Implementation Plan
 
-### Phase 1: Foundation
+### Phase 1: Foundation + XML Integration
 
-**Goal**: Establish motor database infrastructure and basic tests
+**Goal**: Establish motor database infrastructure with XML read/write support
 
 **Tasks**:
 1. Design and implement `MotorSpecification` dataclass
-2. Implement JSON database loader with validation
-3. Create 3 example motor specs:
+2. Implement JSON database loader with flexible path resolution
+3. **Implement XML integration for motor_spec references**
+4. Create 3 example motor specs:
    - Unitree 7520-14 (high-torque)
    - Unitree 5020-9 (mid-range)
    - Test motor (simplified for unit tests)
-4. Write motor database tests (~7 tests)
-5. Write basic electrical property tests (~5 tests)
+5. Write motor database tests (~18 tests)
+6. Write XML integration tests (~14 tests)
 
 **Deliverables**:
 - `src/mjlab/motor_database/motor_spec.py`
 - `src/mjlab/motor_database/database.py`
+- **`src/mjlab/motor_database/xml_integration.py`** (NEW)
 - `src/mjlab/motor_database/motors/*.json` (3 motor specs)
 - `tests/test_motor_database.py`
+- **`tests/test_motor_xml.py`** (NEW)
 
 **Validation**:
 ```bash
 uv run pytest tests/test_motor_database.py -v
+uv run pytest tests/test_motor_xml.py -v
 ```
+
+**Status**: ✅ **COMPLETED** (32 tests passing)
 
 ### Phase 2: Electrical Actuator
 
