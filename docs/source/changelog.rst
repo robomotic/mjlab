@@ -8,6 +8,13 @@ Upcoming version (not yet released)
 Added
 ^^^^^
 
+- **Real-time motor/battery metrics visualization**: Added 10 new metric functions
+  to visualize electrical actuator and battery telemetry in real-time through the
+  Viser viewer. Metrics include motor current/voltage/power/temperature/back-EMF and
+  battery SOC/voltage/current/power/temperature. Use ``electrical_metrics_preset()``
+  for quick setup. Motor/battery metrics automatically appear in the Viser viewer's
+  Metrics tab with real-time plotting, checkbox filtering, and 300-point history
+  (:issue:`XXX`).
 - Added ``STAIRS_TERRAINS_CFG`` terrain preset for progressive stair
   curriculum training and ``@terrain_preset`` decorator for composing
   terrain configurations from reusable presets.
