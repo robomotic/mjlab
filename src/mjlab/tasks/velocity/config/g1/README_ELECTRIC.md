@@ -57,9 +57,22 @@ uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric --viewer viser \
 - `motor_back_emf_avg` - Average back-EMF
 - `battery_soc` - State of charge (0-1 scale)
 - `battery_voltage` - Terminal voltage
-- `battery_current` - Total current draw
-- `battery_power` - Output power
+- `battery_current` - Total current draw **from motors only**
+- `battery_power` - Output power **to motors only**
 - `battery_temperature` - Battery temperature
+
+**Important: Interpreting Battery Metrics**
+
+Battery current and power represent **only the power drawn by motors**. When you see zero current/power:
+- ✅ **Simulation perspective**: Motors are not drawing power (idle or backdriven with regen disabled)
+- ⚠️ **Real robot perspective**: Battery would still supply baseline power for:
+  - Control electronics (motor drivers, microcontrollers: ~2-5A)
+  - Sensors (IMU, cameras, encoders: ~0.5-1A)
+  - Communication systems (WiFi, Ethernet: ~0.5-1A)
+  - Computation (onboard computer: ~2-5A)
+  - **Typical baseline: 5-10A even when standing still**
+
+The current simulation models only motor power draw. In a real Unitree G1, battery current would never drop below ~5-10A during operation.
 
 ## Training with Electrical Metrics
 
@@ -317,6 +330,24 @@ When regenerative braking is **enabled**:
 - Only use for battery specs with explicit charge acceptance capability
 
 ## Troubleshooting
+
+### Battery current/power drops to zero
+
+**What you're seeing:** Spikes where battery current and power go to zero in the metrics plots.
+
+**Why this happens:**
+- Battery metrics represent **only motor power draw**
+- When all motors have low torque demand or are backdriven (with regen disabled), battery current → 0
+- This is expected behavior in the simulation
+
+**Real robot behavior:**
+- Battery current would **never** be zero during operation
+- Baseline power draw: 5-10A for electronics, sensors, computation, communication
+- Motor power is typically 50-90% of total power during locomotion
+
+**Current limitation:** The simulation models only motor electrical dynamics. Future enhancement could add a configurable `base_load_current` parameter to represent parasitic loads.
+
+### Other Resources
 
 - [Motor Database Documentation](../../../motor_database/)
 - [Battery Database Documentation](../../../battery_database/)
