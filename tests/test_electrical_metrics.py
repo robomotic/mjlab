@@ -223,7 +223,7 @@ def test_electrical_metrics_preset_all():
   assert "battery_temperature" in result
 
   # Verify all values are MetricsTermCfg
-  for key, value in result.items():
+  for value in result.values():
     assert isinstance(value, MetricsTermCfg)
     assert callable(value.func)
 

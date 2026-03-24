@@ -15,6 +15,15 @@ Added
   for quick setup. Motor/battery metrics automatically appear in the Viser viewer's
   Metrics tab with real-time plotting, checkbox filtering, and 300-point history
   (:issue:`XXX`).
+- **Per-joint electrical metrics**: Added 5 new per-joint metric functions
+  (``motor_current_joint``, ``motor_voltage_joint``, ``motor_power_joint``,
+  ``motor_temperature_joint``, ``motor_back_emf_joint``) for monitoring individual
+  motor joints. Useful for detailed motor diagnostics and identifying problematic joints.
+- **Cumulative energy metrics**: Added class-based ``CumulativeEnergyMetric`` and
+  ``CumulativeMechanicalWorkMetric`` for tracking total electrical energy consumed
+  and mechanical work output over episodes. These metrics automatically reset on
+  episode boundaries and log final values for analysis. Useful for energy efficiency
+  optimization and comparing different control strategies (:issue:`XXX`).
 - Added ``STAIRS_TERRAINS_CFG`` terrain preset for progressive stair
   curriculum training and ``@terrain_preset`` decorator for composing
   terrain configurations from reusable presets.

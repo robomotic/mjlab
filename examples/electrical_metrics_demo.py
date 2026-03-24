@@ -19,7 +19,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 import mujoco
 
@@ -120,7 +119,7 @@ def main():
 
   print("\n3. Electrical metrics available:")
   metrics = electrical_metrics_preset()
-  for i, (name, cfg) in enumerate(metrics.items(), 1):
+  for i, name in enumerate(metrics.keys(), 1):
     print(f"   {i}. {name}")
 
   print("\n4. Battery and motor state:")

@@ -187,6 +187,177 @@ def motor_back_emf_avg(
   return torch.mean(torch.abs(all_back_emf), dim=1)
 
 
+# Per-Joint Motor Metrics
+
+
+def motor_current_joint(
+  env: ManagerBasedRlEnv, entity_name: str = "robot", joint_name: str | None = None
+) -> torch.Tensor:
+  """Motor current for a specific joint.
+
+  Args:
+    env: The RL environment.
+    entity_name: Name of the entity containing electrical motors.
+    joint_name: Name of the joint to monitor. If None, returns zeros.
+
+  Returns:
+    Per-environment current in amperes for the specified joint. Shape: ``(B,)``.
+    Returns zeros if joint not found or not an electrical motor.
+  """
+  if joint_name is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  entity = env.scene.entities.get(entity_name)
+  if entity is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  from mjlab.actuator import ElectricalMotorActuator
+
+  # Find the actuator controlling this joint
+  for actuator in entity._actuators:
+    if isinstance(actuator, ElectricalMotorActuator):
+      # Check if this joint is in the actuator's target names
+      if hasattr(actuator, "_target_names") and joint_name in actuator._target_names:
+        joint_idx = actuator._target_names.index(joint_name)
+        assert actuator.current is not None
+        return torch.abs(actuator.current[:, joint_idx])
+
+  # Joint not found or not electrical
+  return torch.zeros(env.num_envs, device=env.device)
+
+
+def motor_voltage_joint(
+  env: ManagerBasedRlEnv, entity_name: str = "robot", joint_name: str | None = None
+) -> torch.Tensor:
+  """Motor voltage for a specific joint.
+
+  Args:
+    env: The RL environment.
+    entity_name: Name of the entity containing electrical motors.
+    joint_name: Name of the joint to monitor. If None, returns zeros.
+
+  Returns:
+    Per-environment voltage in volts for the specified joint. Shape: ``(B,)``.
+    Returns zeros if joint not found or not an electrical motor.
+  """
+  if joint_name is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  entity = env.scene.entities.get(entity_name)
+  if entity is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  from mjlab.actuator import ElectricalMotorActuator
+
+  for actuator in entity._actuators:
+    if isinstance(actuator, ElectricalMotorActuator):
+      if hasattr(actuator, "_target_names") and joint_name in actuator._target_names:
+        joint_idx = actuator._target_names.index(joint_name)
+        assert actuator.voltage is not None
+        return torch.abs(actuator.voltage[:, joint_idx])
+
+  return torch.zeros(env.num_envs, device=env.device)
+
+
+def motor_power_joint(
+  env: ManagerBasedRlEnv, entity_name: str = "robot", joint_name: str | None = None
+) -> torch.Tensor:
+  """Motor power dissipation for a specific joint.
+
+  Args:
+    env: The RL environment.
+    entity_name: Name of the entity containing electrical motors.
+    joint_name: Name of the joint to monitor. If None, returns zeros.
+
+  Returns:
+    Per-environment power dissipation in watts for the specified joint. Shape: ``(B,)``.
+    Returns zeros if joint not found or not an electrical motor.
+  """
+  if joint_name is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  entity = env.scene.entities.get(entity_name)
+  if entity is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  from mjlab.actuator import ElectricalMotorActuator
+
+  for actuator in entity._actuators:
+    if isinstance(actuator, ElectricalMotorActuator):
+      if hasattr(actuator, "_target_names") and joint_name in actuator._target_names:
+        joint_idx = actuator._target_names.index(joint_name)
+        assert actuator.power_dissipation is not None
+        return actuator.power_dissipation[:, joint_idx]
+
+  return torch.zeros(env.num_envs, device=env.device)
+
+
+def motor_temperature_joint(
+  env: ManagerBasedRlEnv, entity_name: str = "robot", joint_name: str | None = None
+) -> torch.Tensor:
+  """Motor winding temperature for a specific joint.
+
+  Args:
+    env: The RL environment.
+    entity_name: Name of the entity containing electrical motors.
+    joint_name: Name of the joint to monitor. If None, returns zeros.
+
+  Returns:
+    Per-environment temperature in degrees Celsius for the specified joint. Shape: ``(B,)``.
+    Returns zeros if joint not found or not an electrical motor.
+  """
+  if joint_name is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  entity = env.scene.entities.get(entity_name)
+  if entity is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  from mjlab.actuator import ElectricalMotorActuator
+
+  for actuator in entity._actuators:
+    if isinstance(actuator, ElectricalMotorActuator):
+      if hasattr(actuator, "_target_names") and joint_name in actuator._target_names:
+        joint_idx = actuator._target_names.index(joint_name)
+        assert actuator.winding_temperature is not None
+        return actuator.winding_temperature[:, joint_idx]
+
+  return torch.zeros(env.num_envs, device=env.device)
+
+
+def motor_back_emf_joint(
+  env: ManagerBasedRlEnv, entity_name: str = "robot", joint_name: str | None = None
+) -> torch.Tensor:
+  """Motor back-EMF for a specific joint.
+
+  Args:
+    env: The RL environment.
+    entity_name: Name of the entity containing electrical motors.
+    joint_name: Name of the joint to monitor. If None, returns zeros.
+
+  Returns:
+    Per-environment back-EMF in volts for the specified joint. Shape: ``(B,)``.
+    Returns zeros if joint not found or not an electrical motor.
+  """
+  if joint_name is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  entity = env.scene.entities.get(entity_name)
+  if entity is None:
+    return torch.zeros(env.num_envs, device=env.device)
+
+  from mjlab.actuator import ElectricalMotorActuator
+
+  for actuator in entity._actuators:
+    if isinstance(actuator, ElectricalMotorActuator):
+      if hasattr(actuator, "_target_names") and joint_name in actuator._target_names:
+        joint_idx = actuator._target_names.index(joint_name)
+        assert actuator.back_emf is not None
+        return torch.abs(actuator.back_emf[:, joint_idx])
+
+  return torch.zeros(env.num_envs, device=env.device)
+
+
 # Battery Metrics
 
 
@@ -273,6 +444,204 @@ def battery_temperature(env: ManagerBasedRlEnv) -> torch.Tensor:
     return torch.zeros(env.num_envs, device=env.device)
   assert battery.temperature is not None
   return battery.temperature
+
+
+# Class-Based Cumulative Metrics
+
+
+class CumulativeEnergyMetric:
+  """Cumulative electrical energy consumption metric.
+
+  Tracks total electrical energy consumed from battery over an episode.
+  Resets to zero at episode start and accumulates energy each step.
+
+  The metric computes: E_total = ∫ P_battery * dt (in watt-hours)
+
+  Example:
+    Add to environment config::
+
+      from mjlab.envs.mdp.metrics import CumulativeEnergyMetric
+      from mjlab.managers import MetricsTermCfg
+
+      cfg.metrics = {
+          "energy_consumed_wh": MetricsTermCfg(func=CumulativeEnergyMetric()),
+      }
+  """
+
+  def __init__(self):
+    """Initialize cumulative energy metric."""
+    self._cumulative_energy: torch.Tensor | None = None
+    self._num_envs: int = 0
+    self._device: str = "cpu"
+    self._dt: float = 0.0
+
+  def __call__(self, env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Compute cumulative energy consumption.
+
+    Args:
+      env: The RL environment.
+
+    Returns:
+      Per-environment cumulative energy in watt-hours. Shape: ``(B,)``.
+      Returns zeros if no battery is present.
+    """
+    # Initialize on first call
+    if self._cumulative_energy is None:
+      self._num_envs = env.num_envs
+      self._device = env.device
+      self._dt = env.physics_dt * env.cfg.decimation  # Environment step time
+      self._cumulative_energy = torch.zeros(
+        self._num_envs, device=self._device, dtype=torch.float32
+      )
+
+    # Get battery power
+    battery = env.scene._battery_manager
+    if battery is None or battery.power_out is None:
+      return self._cumulative_energy
+
+    # Accumulate energy: E += P * dt (convert to Wh: divide by 3600)
+    power_watts = battery.power_out  # (B,)
+    energy_increment_wh = power_watts * self._dt / 3600.0  # Convert J to Wh
+    self._cumulative_energy += energy_increment_wh
+
+    return self._cumulative_energy
+
+  def reset(self, env_ids: torch.Tensor | None = None) -> dict[str, float]:
+    """Reset cumulative energy for specified environments.
+
+    Args:
+      env_ids: Environment indices to reset. If None, resets all.
+
+    Returns:
+      Dictionary with final energy values before reset (for logging).
+    """
+    if self._cumulative_energy is None:
+      return {}
+
+    if env_ids is None:
+      # Reset all environments
+      final_values = {
+        f"final_energy_wh_env_{i}": self._cumulative_energy[i].item()
+        for i in range(self._num_envs)
+      }
+      self._cumulative_energy.zero_()
+    else:
+      # Reset specific environments
+      final_values = {
+        f"final_energy_wh_env_{i}": self._cumulative_energy[i].item()
+        for i in env_ids.tolist()
+      }
+      self._cumulative_energy[env_ids] = 0.0
+
+    return final_values
+
+
+class CumulativeMechanicalWorkMetric:
+  """Cumulative mechanical work output metric.
+
+  Tracks total mechanical work performed by all motors over an episode.
+  Resets to zero at episode start and accumulates work each step.
+
+  The metric computes: W_total = ∫ τ * ω * dt (in joules)
+
+  Example:
+    Add to environment config::
+
+      from mjlab.envs.mdp.metrics import CumulativeMechanicalWorkMetric
+      from mjlab.managers import MetricsTermCfg
+
+      cfg.metrics = {
+          "mechanical_work_j": MetricsTermCfg(func=CumulativeMechanicalWorkMetric()),
+      }
+  """
+
+  def __init__(self, entity_name: str = "robot"):
+    """Initialize cumulative mechanical work metric.
+
+    Args:
+      entity_name: Name of the entity containing electrical motors.
+    """
+    self._entity_name = entity_name
+    self._cumulative_work: torch.Tensor | None = None
+    self._num_envs: int = 0
+    self._device: str = "cpu"
+    self._dt: float = 0.0
+
+  def __call__(self, env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Compute cumulative mechanical work.
+
+    Args:
+      env: The RL environment.
+
+    Returns:
+      Per-environment cumulative work in joules. Shape: ``(B,)``.
+      Returns zeros if no electrical motors are present.
+    """
+    # Initialize on first call
+    if self._cumulative_work is None:
+      self._num_envs = env.num_envs
+      self._device = env.device
+      self._dt = env.physics_dt * env.cfg.decimation
+      self._cumulative_work = torch.zeros(
+        self._num_envs, device=self._device, dtype=torch.float32
+      )
+
+    entity = env.scene.entities.get(self._entity_name)
+    if entity is None:
+      return self._cumulative_work
+
+    from mjlab.actuator import ElectricalMotorActuator
+
+    # Accumulate work from all electrical motors: W += τ * ω * dt
+    for actuator in entity._actuators:
+      if isinstance(actuator, ElectricalMotorActuator):
+        # Get joint velocities for this actuator's joints
+        joint_indices = actuator._target_indices
+        joint_velocities = entity._data.joint_vel[:, joint_indices]  # (B, N)
+
+        # Estimate torque from motor model: τ = Kt * I * N
+        # (This is an approximation - actual applied torque may differ due to dynamics)
+        torque_est = (
+          actuator.motor_spec.motor_constant_kt
+          * actuator.current
+          * actuator.motor_spec.gear_ratio
+        )  # (B, N)
+
+        # Power = τ * ω
+        power = torque_est * joint_velocities  # (B, N)
+
+        # Work increment: W += P * dt
+        work_increment = torch.sum(power, dim=1) * self._dt  # (B,)
+        self._cumulative_work += work_increment
+
+    return self._cumulative_work
+
+  def reset(self, env_ids: torch.Tensor | None = None) -> dict[str, float]:
+    """Reset cumulative work for specified environments.
+
+    Args:
+      env_ids: Environment indices to reset. If None, resets all.
+
+    Returns:
+      Dictionary with final work values before reset (for logging).
+    """
+    if self._cumulative_work is None:
+      return {}
+
+    if env_ids is None:
+      final_values = {
+        f"final_work_j_env_{i}": self._cumulative_work[i].item()
+        for i in range(self._num_envs)
+      }
+      self._cumulative_work.zero_()
+    else:
+      final_values = {
+        f"final_work_j_env_{i}": self._cumulative_work[i].item()
+        for i in env_ids.tolist()
+      }
+      self._cumulative_work[env_ids] = 0.0
+
+    return final_values
 
 
 # Convenience Helper
