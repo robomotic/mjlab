@@ -8,22 +8,86 @@ Upcoming version (not yet released)
 Added
 ^^^^^
 
-- **Real-time motor/battery metrics visualization**: Added 10 new metric functions
-  to visualize electrical actuator and battery telemetry in real-time through the
-  Viser viewer. Metrics include motor current/voltage/power/temperature/back-EMF and
-  battery SOC/voltage/current/power/temperature. Use ``electrical_metrics_preset()``
-  for quick setup. Motor/battery metrics automatically appear in the Viser viewer's
-  Metrics tab with real-time plotting, checkbox filtering, and 300-point history
-  (:issue:`XXX`).
-- **Per-joint electrical metrics**: Added 5 new per-joint metric functions
+- **PID-controlled cartpole**: Added ``Mjlab-Cartpole-Balance-PID`` task demonstrating
+  classical PID control integration with mjlab. Includes standalone ``PidControlAction``
+  action term that computes control forces from observations using tunable PID gains.
+  Works with ``--agent zero`` for visualizing hand-tuned control policies without training.
+- **Motor database with electrical characteristics** (Phase 1): Added comprehensive
+  motor database infrastructure for realistic electrical and thermal motor modeling.
+  Includes ``MotorSpecification`` dataclass with electrical properties (resistance,
+  inductance, motor constants), mechanical properties (gear ratio, inertia, torque limits),
+  and thermal properties (thermal resistance, time constant, temperature limits).
+  Database loader supports flexible path resolution (built-in, user directory, project
+  directory, environment variable, URLs). XML integration enables storing motor specs
+  in MuJoCo XML files via ``<custom><text>`` elements for sharing via MuJoCo Menagerie.
+  Added ``load_motor_spec()``, ``write_motor_spec_to_xml()``, ``parse_motor_specs_from_xml()``
+  functions. Includes 3 example motor specs (Unitree 7520-14, 5020-9, test motor).
+  New files: ``motor_database/motor_spec.py``, ``motor_database/database.py``,
+  ``motor_database/xml_integration.py``, ``motor_database/motors/*.json``.
+  Tests: ``test_motor_database.py`` (18 tests), ``test_motor_xml.py`` (14 tests).
+- **Electrical motor actuator** (Phase 2): Added ``ElectricalMotorActuator`` with full
+  RL circuit electrical dynamics and first-order thermal modeling. Implements semi-implicit
+  integration for numerical stability (V = I·R + L·dI/dt + Ke·ω). Tracks per-environment
+  per-joint electrical state: current, voltage, back-EMF, power dissipation, winding
+  temperature. Supports voltage clamping, temperature limits, and motor constant
+  validation. Fully GPU-batched for efficient parallel simulation. Added
+  ``ElectricalMotorActuatorCfg`` configuration class. New file:
+  ``actuator/electrical_motor_actuator.py``. Tests: ``test_electrical_motor_actuator.py``
+  (13 tests covering RL circuit dynamics, thermal dynamics, PD integration, batching).
+- **Battery system and power management** (Phase 2B): Added battery database and
+  ``BatteryManager`` for scene-level power management. Implements realistic voltage drop
+  physics (V_terminal = V_oc(SOC) - I·R(SOC,T)), state-of-charge tracking (dSOC/dt =
+  -I/(Q·3600)), and thermal dynamics (dT/dt = (I²R - (T-T_amb)/R_th)/τ_th). Supports
+  multiple chemistries (LiPo, LiFePO4, Li-ion) with non-linear OCV curves and
+  SOC-dependent internal resistance. Includes inverter efficiency modeling for PMSM
+  motors (DC-to-AC conversion losses). Battery voltage dynamically limits motor
+  performance via ``enable_voltage_feedback``. Aggregates current from all electrical
+  motor actuators per step. Added ``BatterySpecification``, ``BatteryManager``,
+  ``BatteryManagerCfg``, ``InverterCfg`` classes. New files: ``battery_database/
+  battery_spec.py``, ``battery_database/database.py``, ``battery_database/xml_integration.py``,
+  ``battery_database/batteries/*.json``, ``battery/battery_manager.py``,
+  ``actuator/inverter.py``. Modified: ``scene/scene.py`` (battery integration hooks),
+  ``actuator/electrical_motor_actuator.py`` (inverter support). Tests:
+  ``test_battery_database.py`` (19 tests), ``test_battery_manager.py`` (24 tests).
+- **Automatic motor/battery integration** (Phase 3): Added automatic discovery and
+  integration of motor specs and battery from XML ``<custom><text>`` elements. Eliminates
+  manual configuration - motors and battery are automatically created from XML annotations.
+  Added ``auto_discover_motors`` flag to ``EntityCfg`` (default True) and ``auto_battery``
+  flag to ``SceneCfg`` (default True). Manual configuration takes precedence over
+  auto-discovery. Modified: ``entity/entity.py`` (``_auto_discover_motors()`` method),
+  ``scene/scene.py`` (``_auto_discover_battery()`` method). Tests: ``test_auto_discovery.py``
+  (7 tests). All 770 existing tests continue to pass (backward compatible).
+- **Electrical validation and documentation** (Phase 4): Added performance benchmarks,
+  datasheet validation tests, and energy conservation validation. Performance: ~63%
+  overhead vs DC motor (acceptable for full RL+thermal physics), <100ms per step with
+  1000 environments. Datasheet validation confirms Unitree 7520-14/5020-9 specs
+  (stall torque, no-load speed, torque-speed curves, thermal limits). Energy conservation
+  tests verify power balance and heat dissipation. Added comprehensive
+  ``ElectricalMotorActuator`` documentation to actuators.rst with physics equations,
+  usage examples, and validation references. New files: ``test_electrical_performance.py``
+  (3 tests), ``validation/test_motor_datasheet_validation.py`` (8 tests),
+  ``validation/test_energy_conservation.py`` (5 tests). Modified: ``docs/source/actuators.rst``.
+- **Real-time motor/battery metrics visualization** (Phase 6): Added 15 electrical
+  metric functions for real-time visualization through the existing Viser viewer
+  infrastructure. Includes 5 aggregate motor metrics (``motor_current_avg``,
+  ``motor_voltage_avg``, ``motor_power_total``, ``motor_temperature_max``,
+  ``motor_back_emf_avg``), 5 battery metrics (``battery_soc``, ``battery_voltage``,
+  ``battery_current``, ``battery_power``, ``battery_temperature``), 5 per-joint metrics
   (``motor_current_joint``, ``motor_voltage_joint``, ``motor_power_joint``,
-  ``motor_temperature_joint``, ``motor_back_emf_joint``) for monitoring individual
-  motor joints. Useful for detailed motor diagnostics and identifying problematic joints.
-- **Cumulative energy metrics**: Added class-based ``CumulativeEnergyMetric`` and
-  ``CumulativeMechanicalWorkMetric`` for tracking total electrical energy consumed
-  and mechanical work output over episodes. These metrics automatically reset on
-  episode boundaries and log final values for analysis. Useful for energy efficiency
-  optimization and comparing different control strategies (:issue:`XXX`).
+  ``motor_temperature_joint``, ``motor_back_emf_joint``), and 2 cumulative metrics
+  (``CumulativeEnergyMetric``, ``CumulativeMechanicalWorkMetric``). Added
+  ``electrical_metrics_preset()`` helper for one-line setup. Metrics automatically
+  appear in Viser viewer's Metrics tab with real-time plotting (300-point history,
+  60 fps), checkbox filtering, and text search. Correctly visualizes regenerative
+  braking (negative battery power when motors are backdriven by gravity). <2%
+  performance overhead. Added ``Mjlab-Velocity-Flat-Unitree-G1-Electric`` and
+  ``Mjlab-Velocity-Rough-Unitree-G1-Electric`` tasks demonstrating electrical motors
+  with battery visualization. New/modified files: ``envs/mdp/metrics.py`` (+200 lines),
+  ``tasks/velocity/config/g1/env_cfgs_electric.py``, ``tasks/velocity/config/g1/
+  README_ELECTRIC.md``, ``tasks/velocity/config/g1/__init__.py``, ``examples/
+  electrical_metrics_viz_simple.py``. Tests: ``test_electrical_metrics_advanced.py``
+  (18 tests). Run with: ``uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric
+  --agent zero --viewer viser``.
 - Added ``STAIRS_TERRAINS_CFG`` terrain preset for progressive stair
   curriculum training and ``@terrain_preset`` decorator for composing
   terrain configurations from reusable presets.
