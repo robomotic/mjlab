@@ -46,6 +46,7 @@ uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric --viewer viser \
 - Tracks state of charge (SOC) - depletes during simulation
 - Voltage feedback: motor performance degrades as battery drains
 - Temperature modeling
+- **Regenerative braking disabled by default** (realistic for Li-ion batteries)
 
 ### 3. **Real-time Metrics in Viser**
 10 aggregate metrics automatically visualized:
@@ -274,6 +275,46 @@ cfg.scene.battery = BatteryManagerCfg(
 ```
 
 This keeps battery metrics for logging but motors always have full voltage.
+
+## Regenerative Braking Control
+
+By default, batteries **do not accept regenerative braking** - when motors are backdriven (e.g., by gravity), negative current is clamped to zero. This is realistic for most commercial robot batteries (Li-Po, Li-ion) that lack charging circuits.
+
+**Default configuration (no regenerative braking):**
+```python
+cfg.scene.battery = BatteryManagerCfg(
+    battery_spec=load_battery_spec("unitree_g1_9ah"),
+    entity_names=("robot",),
+    initial_soc=1.0,
+    enable_voltage_feedback=True,
+    allow_regenerative_braking=False,  # Default: reject backfeed
+)
+```
+
+When regenerative braking is **disabled** (default):
+- Negative motor current is clamped to zero at battery level
+- Energy dissipates as heat in motor windings (I²R loss)
+- Battery SOC never increases
+- Battery current and power are always non-negative
+- More realistic for standard Li-Po/Li-ion batteries
+
+**Enable regenerative braking (future batteries with charge controller):**
+```python
+cfg.scene.battery = BatteryManagerCfg(
+    battery_spec=load_battery_spec("future_lifepo4_regen"),
+    entity_names=("robot",),
+    initial_soc=0.5,
+    enable_voltage_feedback=True,
+    allow_regenerative_braking=True,  # Allow energy return
+)
+```
+
+When regenerative braking is **enabled**:
+- Negative motor current flows back to battery
+- Battery SOC increases during backdriving
+- Battery current can be negative (charging)
+- More power-efficient simulation
+- Only use for battery specs with explicit charge acceptance capability
 
 ## Troubleshooting
 

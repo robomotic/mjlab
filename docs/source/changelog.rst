@@ -108,6 +108,15 @@ Added
   design-proposal.md`` (+60 lines). Tests: ``test_cable_powered.py`` (3 tests).
   Run with: ``uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable
   --agent zero --viewer viser``.
+- **Regenerative braking control**: Added ``allow_regenerative_braking`` flag to
+  ``BatteryManagerCfg`` to control whether batteries accept negative current from
+  backdriven motors. Default is ``False`` (reject regenerative braking) for
+  realistic simulation of commercial Li-Po/Li-ion batteries without charge circuits.
+  Set to ``True`` only for future battery specs that explicitly support regenerative
+  charging. When disabled, negative motor current is clamped to zero and energy
+  dissipates as heat in motor windings. New/modified files: ``battery/battery_manager.py``
+  (+18 lines docstring, +4 lines code), ``tasks/velocity/config/g1/README_ELECTRIC.md``
+  (+40 lines). Tests: ``test_battery_manager.py`` (+3 regenerative braking tests).
 - Added ``STAIRS_TERRAINS_CFG`` terrain preset for progressive stair
   curriculum training and ``@terrain_preset`` decorator for composing
   terrain configurations from reusable presets.

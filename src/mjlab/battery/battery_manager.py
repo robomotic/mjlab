@@ -39,6 +39,25 @@ class BatteryManagerCfg:
   enable_voltage_feedback: bool = True
   """Whether to dynamically update motor voltage limits based on battery state."""
 
+  allow_regenerative_braking: bool = False
+  """Whether to allow motor current to flow back into battery during braking.
+
+  When motors are backdriven (e.g., by gravity), they act as generators
+  and produce negative current. This flag controls whether that current
+  is accepted by the battery:
+
+  - False (default): Battery rejects backfeed; negative current clamped to zero.
+    Energy dissipates as heat in motor windings. Realistic for most commercial
+    batteries (Li-Po, Li-ion) that lack charging circuits.
+
+  - True: Motors can return energy to battery (regenerative braking). Battery
+    SOC increases when backdriven. Only use for battery specs that explicitly
+    support regenerative charging (e.g., future LiFePO4 models with charge
+    controller).
+
+  Default is False for backwards compatibility and realistic simulation.
+  """
+
 
 class BatteryManager:
   """Manages battery state and power distribution for a scene.
@@ -196,7 +215,12 @@ class BatteryManager:
           # Sum across all joints (dimension 1)
           self.current += actuator.current.sum(dim=1)
 
-    # Clamp to battery limits
+    # Clamp negative current if regenerative braking disabled
+    if not self.cfg.allow_regenerative_braking:
+      # Reject negative current (no energy return to battery)
+      self.current = torch.clamp(self.current, min=0.0)
+
+    # Clamp to battery maximum continuous current
     self.current = torch.clamp(
       self.current, max=self.cfg.battery_spec.max_continuous_current
     )

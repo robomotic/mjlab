@@ -2713,6 +2713,60 @@ cfg.metrics = electrical_metrics_preset(
 - Documentation: `src/mjlab/tasks/velocity/config/g1/README_ELECTRIC.md`
 - Tests: `tests/test_cable_powered.py` (3 tests)
 
+### Regenerative Braking Control (Implemented)
+
+**Status**: ✅ **IMPLEMENTED** (Regenerative braking control flag added)
+
+Added `allow_regenerative_braking` flag to `BatteryManagerCfg` to control whether batteries accept negative current from backdriven motors. Default is `False` (disabled) for realistic simulation.
+
+**Problem Solved:**
+When motors are backdriven (e.g., by gravity), they act as generators and produce negative current. Most commercial robot batteries (Li-Po, Li-ion) cannot accept this charging current - they lack the necessary charge controller circuits. Previously, the system unrealistically allowed this energy to flow back into the battery.
+
+**Solution:**
+```python
+@dataclass
+class BatteryManagerCfg:
+    battery_spec: BatterySpecification
+    entity_names: tuple[str, ...] = ("robot",)
+    initial_soc: float = 1.0
+    enable_voltage_feedback: bool = True
+
+    allow_regenerative_braking: bool = False
+    """Whether to allow motor current to flow back into battery during braking.
+
+    - False (default): Battery rejects backfeed; negative current clamped to zero.
+      Energy dissipates as heat in motor windings. Realistic for Li-Po/Li-ion.
+
+    - True: Motors can return energy to battery (regenerative braking).
+      Only for battery specs with charge controllers (e.g., future LiFePO4).
+    """
+```
+
+**Implementation:**
+In `BatteryManager.aggregate_current()`, negative current is clamped to zero when regenerative braking is disabled:
+
+```python
+# Clamp negative current if regenerative braking disabled
+if not self.cfg.allow_regenerative_braking:
+    # Reject negative current (no energy return to battery)
+    self.current = torch.clamp(self.current, min=0.0)
+```
+
+**Behavior Comparison:**
+
+| Feature | Regen Disabled (default) | Regen Enabled |
+|---------|-------------------------|---------------|
+| Negative motor current | Clamped to zero | Flows to battery |
+| Battery SOC during braking | Never increases | Increases |
+| Battery current | Always ≥ 0 | Can be < 0 |
+| Energy dissipation | Heat in windings | Returned to battery |
+| Use case | Li-Po, Li-ion (realistic) | Future batteries with charge circuit |
+
+**Files:**
+- Core implementation: `src/mjlab/battery/battery_manager.py`
+- Tests: `tests/test_battery_manager.py` (3 regenerative braking tests)
+- Documentation: `src/mjlab/tasks/velocity/config/g1/README_ELECTRIC.md`
+
 ### Other Future Work
 
 
