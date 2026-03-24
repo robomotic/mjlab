@@ -2650,6 +2650,69 @@ make test
    - Cross-run comparisons of energy consumption
    - Pareto frontier for reward vs energy efficiency
 
+### Cable-Powered Mode (Implemented)
+
+**Status**: ✅ **IMPLEMENTED** (Cable power support added)
+
+Cable-powered mode provides electrical motors with **infinite power** - no battery, no voltage sag, constant full voltage. This is useful for benchtop testing, training without power constraints, and maximum performance evaluation.
+
+**How it works:**
+- Simply omit the battery configuration: `cfg.scene.battery = None` (default)
+- Motors use their full rated voltage from `motor_spec.voltage_range[1]`
+- No voltage updates from battery → constant maximum voltage
+- No SOC depletion, no energy tracking
+
+**Example Configuration:**
+```python
+from mjlab.envs.mdp.metrics import electrical_metrics_preset
+
+cfg = base_robot_cfg()
+
+# Add electrical motors
+cfg.scene.entities["robot"].articulation = EntityArticulationInfoCfg(
+    actuators=(
+        ElectricalMotorActuatorCfg(
+            target_names_expr=(".*_joint",),
+            motor_spec=load_motor_spec("unitree_7520_14"),
+        ),
+    )
+)
+
+# NO BATTERY → Cable-powered mode (infinite power)
+# cfg.scene.battery = None  # (default)
+
+# Add motor-only metrics (no battery metrics)
+cfg.metrics = electrical_metrics_preset(
+    include_motor=True,
+    include_battery=False,  # No battery present
+)
+```
+
+**Available Tasks:**
+- `Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable` - G1 with cable power
+- Run with: `uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable --agent zero --viewer viser`
+
+**Comparison: Battery vs Cable vs Battery (feedback disabled)**
+
+| Feature | Battery-Powered | Cable-Powered | Battery (feedback off) |
+|---------|----------------|---------------|----------------------|
+| Config | `battery=BatteryManagerCfg(...)` | `battery=None` | `enable_voltage_feedback=False` |
+| Voltage | Variable (sags) | Constant (24V) | Constant (24V) |
+| SOC Tracking | ✅ Yes | ❌ No | ✅ Yes |
+| Energy Metrics | Battery + Motor | Motor only | Battery + Motor |
+| Performance | Degrades over time | Always maximum | Always maximum |
+| Use Case | Realistic simulation | Benchtop/training | Energy logging only |
+
+**When to use each mode:**
+- **Battery-powered**: Realistic untethered robot simulation, energy efficiency optimization
+- **Cable-powered**: Benchtop testing, training without constraints, maximum performance
+- **Battery (feedback off)**: Energy accounting without performance degradation
+
+**Files:**
+- Configuration: `src/mjlab/tasks/velocity/config/g1/env_cfgs_electric.py`
+- Documentation: `src/mjlab/tasks/velocity/config/g1/README_ELECTRIC.md`
+- Tests: `tests/test_cable_powered.py` (3 tests)
+
 ### Other Future Work
 
 

@@ -182,7 +182,100 @@ print(f"Motor current: {metrics_dict['motor_current_avg']:.2f}A")
 - Use different motor models from database
 - Tune `effort_limit` (continuous torque rating)
 
-## See Also
+## Cable-Powered Mode (Infinite Power)
+
+For robots powered by a cable (wall power) instead of a battery, use the cable-powered configuration:
+
+```bash
+# Launch cable-powered G1 (no battery, infinite power)
+uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable --agent zero --viewer viser
+```
+
+### What is Cable-Powered Mode?
+
+Cable-powered mode provides **electrical motors WITHOUT a battery**, giving:
+- ✅ Full rated motor voltage (24V) at all times
+- ✅ No voltage sag under load
+- ✅ No SOC depletion
+- ✅ No power constraints
+- ❌ No energy tracking (no battery metrics)
+
+### When to Use Cable-Powered Mode
+
+**Use cable power for:**
+- **Benchtop testing** with wall power supply
+- **Training without power constraints** (maximum performance)
+- **Performance evaluation** at full motor capability
+- **Debugging motor behavior** without battery complexity
+
+**Use battery power for:**
+- **Realistic simulation** of untethered robots
+- **Energy efficiency** optimization and tracking
+- **Endurance testing** with battery depletion
+- **Training policies** that adapt to voltage sag
+
+### Configuration Comparison
+
+| Feature | Battery-Powered | Cable-Powered | Battery (feedback disabled) |
+|---------|----------------|---------------|----------------------------|
+| Voltage | Variable (sags under load) | Constant (24V) | Constant (but battery present) |
+| SOC Tracking | ✅ Yes | ❌ No | ✅ Yes (but not used) |
+| Energy Metrics | ✅ Battery + Motor | ✅ Motor Only | ✅ Battery + Motor |
+| Performance | Degrades as battery drains | Constant (maximum) | Constant (maximum) |
+| Use Case | Realistic simulation | Benchtop/training | Energy accounting only |
+
+### How It Works
+
+When no battery is configured (`cfg.scene.battery = None`):
+1. Motors initialize with their rated voltage from `motor_spec.voltage_range[1]`
+2. Voltage never updated by battery → always at maximum
+3. No voltage sag → no performance degradation
+4. Motors operate at full capability throughout simulation
+
+**Code example:**
+```python
+from mjlab.envs.mdp.metrics import electrical_metrics_preset
+
+def my_cable_powered_robot():
+    cfg = base_robot_cfg()
+
+    # Add electrical motors (from motor database or XML auto-discovery)
+    cfg.scene.entities["robot"].articulation = EntityArticulationInfoCfg(
+        actuators=(
+            ElectricalMotorActuatorCfg(
+                target_names_expr=(".*_joint",),
+                motor_spec=load_motor_spec("unitree_7520_14"),
+            ),
+        )
+    )
+
+    # NO BATTERY CONFIGURED → Cable-powered mode
+    # cfg.scene.battery = None  # (default, omit battery entirely)
+
+    # Add motor metrics only (no battery metrics)
+    cfg.metrics = electrical_metrics_preset(
+        include_motor=True,
+        include_battery=False,  # No battery present
+    )
+
+    return cfg
+```
+
+### Alternative: Battery with Feedback Disabled
+
+If you want **energy tracking** but **no voltage limiting**:
+```python
+cfg.scene.battery = BatteryManagerCfg(
+    battery_spec=load_battery_spec("unitree_g1_9ah"),
+    entity_names=("robot",),
+    initial_soc=1.0,
+    enable_voltage_feedback=False,  # Track energy but don't limit voltage
+)
+```
+
+This keeps battery metrics for logging but motors always have full voltage.
+
+## Troubleshooting
 
 - [Motor Database Documentation](../../../motor_database/)
 - [Battery Database Documentation](../../../battery_database/)

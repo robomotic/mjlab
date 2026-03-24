@@ -96,6 +96,18 @@ Added
   electrical_metrics_viz_simple.py``. Tests: ``test_electrical_metrics_advanced.py``
   (18 tests). Run with: ``uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric
   --agent zero --viewer viser``.
+- **Cable-powered electrical motors**: Electrical motors can now operate without
+  a battery for infinite power scenarios. Simply omit the ``battery`` configuration
+  to enable cable-powered mode with no voltage sag or SOC depletion. Added
+  ``Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable`` task demonstrating cable power.
+  The ``electrical_metrics_preset()`` helper now supports ``include_battery=False``
+  for motor-only metrics. Use for benchtop testing, training without power constraints,
+  or maximum performance evaluation. New/modified files: ``tasks/velocity/config/g1/
+  env_cfgs_electric.py`` (+60 lines), ``tasks/velocity/config/g1/__init__.py`` (+8 lines),
+  ``tasks/velocity/config/g1/README_ELECTRIC.md`` (+80 lines), ``docs/motors/
+  design-proposal.md`` (+60 lines). Tests: ``test_cable_powered.py`` (3 tests).
+  Run with: ``uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric-Cable
+  --agent zero --viewer viser``.
 - Added ``STAIRS_TERRAINS_CFG`` terrain preset for progressive stair
   curriculum training and ``@terrain_preset`` decorator for composing
   terrain configurations from reusable presets.

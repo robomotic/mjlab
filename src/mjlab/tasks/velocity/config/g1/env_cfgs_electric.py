@@ -10,7 +10,6 @@ Register this task and run with:
 """
 
 from mjlab.actuator import ElectricalMotorActuatorCfg
-from mjlab.asset_zoo.robots import G1_ACTION_SCALE, get_g1_robot_cfg
 from mjlab.battery import BatteryManagerCfg
 from mjlab.battery_database import load_battery_spec
 from mjlab.entity import EntityArticulationInfoCfg
@@ -221,5 +220,130 @@ def unitree_g1_rough_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCf
     **(cfg.metrics or {}),
     **electrical_metrics_preset(),
   }
+
+  return cfg
+
+
+def unitree_g1_flat_electric_cable_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 flat terrain config with electrical motors powered by cable (infinite power).
+
+  This configuration uses electrical motors WITHOUT a battery, providing:
+  - Full rated motor voltage (24V) at all times
+  - No voltage sag under load
+  - No SOC depletion
+  - No energy tracking
+
+  Use cases:
+  - Benchtop testing with wall power
+  - Training without power constraints
+  - Maximum performance evaluation
+
+  Args:
+    play: Whether this is for playing/visualization (vs training).
+
+  Returns:
+    Environment configuration with electrical motors, no battery (cable-powered).
+  """
+  # Start with standard G1 flat config
+  cfg = unitree_g1_flat_env_cfg(play=play)
+
+  # Load motor specs
+  hip_knee_motor = load_motor_spec("unitree_7520_14")
+  ankle_arm_motor = load_motor_spec("unitree_5020_9")
+
+  # Replace standard actuators with electrical motor actuators
+  robot_cfg = cfg.scene.entities["robot"]
+  robot_cfg.articulation = EntityArticulationInfoCfg(
+    actuators=(
+      # Hip and knee joints - high torque motors
+      ElectricalMotorActuatorCfg(
+        target_names_expr=(
+          "left_hip_pitch_joint",
+          "right_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "right_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "right_hip_yaw_joint",
+          "left_knee_joint",
+          "right_knee_joint",
+        ),
+        motor_spec=hip_knee_motor,
+        stiffness=200.0,
+        damping=10.0,
+        saturation_effort=hip_knee_motor.peak_torque,
+        velocity_limit=hip_knee_motor.no_load_speed,
+        effort_limit=hip_knee_motor.continuous_torque,
+      ),
+      # Ankle and arm joints - lower torque motors
+      ElectricalMotorActuatorCfg(
+        target_names_expr=(
+          "left_ankle_pitch_joint",
+          "right_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_ankle_roll_joint",
+          "left_shoulder_pitch_joint",
+          "right_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "right_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "right_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "right_elbow_joint",
+        ),
+        motor_spec=ankle_arm_motor,
+        stiffness=200.0,
+        damping=10.0,
+        saturation_effort=ankle_arm_motor.peak_torque,
+        velocity_limit=ankle_arm_motor.no_load_speed,
+        effort_limit=ankle_arm_motor.continuous_torque,
+      ),
+    )
+  )
+
+  # NO BATTERY CONFIGURED → Cable-powered mode (infinite power)
+  # Motors use their full rated voltage (24V) with no voltage sag
+  # cfg.scene.battery = None  # (default, explicit comment for clarity)
+
+  # Add electrical metrics (motor metrics only, no battery metrics)
+  # Battery metrics would show zeros since no battery is present
+  cfg.metrics = {
+    **(cfg.metrics or {}),  # Keep existing metrics
+    **electrical_metrics_preset(
+      include_motor=True,
+      include_battery=False,  # No battery metrics for cable-powered mode
+    ),
+  }
+
+  # Update action scale to match only the joints we're controlling
+  joint_pos_action = cfg.actions["joint_pos"]
+  from mjlab.envs.mdp.actions import JointPositionActionCfg
+
+  if isinstance(joint_pos_action, JointPositionActionCfg):
+    # Only control the 20 joints we have electrical motors for
+    joint_pos_action.actuator_names = (
+      ".*_hip_pitch_joint",
+      ".*_hip_roll_joint",
+      ".*_hip_yaw_joint",
+      ".*_knee_joint",
+      ".*_ankle_pitch_joint",
+      ".*_ankle_roll_joint",
+      ".*_shoulder_pitch_joint",
+      ".*_shoulder_roll_joint",
+      ".*_shoulder_yaw_joint",
+      ".*_elbow_joint",
+    )
+    # Scale values for the 20 joints
+    joint_pos_action.scale = {
+      ".*_hip_pitch_joint": 0.25,
+      ".*_hip_roll_joint": 0.25,
+      ".*_hip_yaw_joint": 0.25,
+      ".*_knee_joint": 0.5,
+      ".*_ankle_pitch_joint": 0.25,
+      ".*_ankle_roll_joint": 0.25,
+      ".*_shoulder_pitch_joint": 0.25,
+      ".*_shoulder_roll_joint": 0.25,
+      ".*_shoulder_yaw_joint": 0.25,
+      ".*_elbow_joint": 0.25,
+    }
 
   return cfg
