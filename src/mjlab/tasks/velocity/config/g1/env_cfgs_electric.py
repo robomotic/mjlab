@@ -54,14 +54,14 @@ def unitree_g1_flat_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
       # Hip and knee joints - high torque motors
       ElectricalMotorActuatorCfg(
         target_names_expr=(
-          "left_hip_pitch",
-          "right_hip_pitch",
-          "left_hip_roll",
-          "right_hip_roll",
-          "left_hip_yaw",
-          "right_hip_yaw",
-          "left_knee",
-          "right_knee",
+          "left_hip_pitch_joint",
+          "right_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "right_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "right_hip_yaw_joint",
+          "left_knee_joint",
+          "right_knee_joint",
         ),
         motor_spec=hip_knee_motor,
         stiffness=200.0,
@@ -73,20 +73,18 @@ def unitree_g1_flat_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
       # Ankle and arm joints - lower torque motors
       ElectricalMotorActuatorCfg(
         target_names_expr=(
-          "left_ankle_pitch",
-          "right_ankle_pitch",
-          "left_ankle_roll",
-          "right_ankle_roll",
-          "left_shoulder_pitch",
-          "right_shoulder_pitch",
-          "left_shoulder_roll",
-          "right_shoulder_roll",
-          "left_shoulder_yaw",
-          "right_shoulder_yaw",
-          "left_elbow_pitch",
-          "right_elbow_pitch",
-          "left_elbow_roll",
-          "right_elbow_roll",
+          "left_ankle_pitch_joint",
+          "right_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_ankle_roll_joint",
+          "left_shoulder_pitch_joint",
+          "right_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "right_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "right_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "right_elbow_joint",
         ),
         motor_spec=ankle_arm_motor,
         stiffness=200.0,
@@ -114,32 +112,38 @@ def unitree_g1_flat_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
     **electrical_metrics_preset(),  # Add all 10 electrical metrics
   }
 
-  # Optional: Add per-joint metrics for specific joints you want to monitor
-  # Uncomment to track individual joint currents:
-  # from mjlab.envs.mdp.metrics import motor_current_joint
-  # from mjlab.managers import MetricsTermCfg
-  # cfg.metrics.update({
-  #     "left_knee_current": MetricsTermCfg(
-  #         func=motor_current_joint,
-  #         params={"joint_name": "left_knee"},
-  #     ),
-  #     "right_hip_current": MetricsTermCfg(
-  #         func=motor_current_joint,
-  #         params={"joint_name": "right_hip_pitch"},
-  #     ),
-  # })
+  # Update action scale to match only the joints we're controlling
+  # (Excluding wrist and waist joints that aren't in electrical actuators)
+  joint_pos_action = cfg.actions["joint_pos"]
+  from mjlab.envs.mdp.actions import JointPositionActionCfg
 
-  # Optional: Add cumulative energy tracking
-  # Tracks total energy consumed over episode (resets on episode boundary)
-  # Uncomment to enable:
-  # from mjlab.envs.mdp.metrics import CumulativeEnergyMetric
-  # cfg.metrics.update({
-  #     "energy_consumed_wh": MetricsTermCfg(func=CumulativeEnergyMetric()),
-  # })
-
-  # Adjust action scale for electrical motors if needed
-  # (May need tuning based on motor response characteristics)
-  # cfg.actions["joint_pos"].scale = G1_ACTION_SCALE
+  if isinstance(joint_pos_action, JointPositionActionCfg):
+    # Only control the 20 joints we have electrical motors for
+    joint_pos_action.actuator_names = (
+      ".*_hip_pitch_joint",
+      ".*_hip_roll_joint",
+      ".*_hip_yaw_joint",
+      ".*_knee_joint",
+      ".*_ankle_pitch_joint",
+      ".*_ankle_roll_joint",
+      ".*_shoulder_pitch_joint",
+      ".*_shoulder_roll_joint",
+      ".*_shoulder_yaw_joint",
+      ".*_elbow_joint",
+    )
+    # Scale values for the 20 joints (2 hips, 2 knees, 2 ankles, 4 arms per side)
+    joint_pos_action.scale = {
+      ".*_hip_pitch_joint": 0.25,
+      ".*_hip_roll_joint": 0.25,
+      ".*_hip_yaw_joint": 0.25,
+      ".*_knee_joint": 0.5,
+      ".*_ankle_pitch_joint": 0.25,
+      ".*_ankle_roll_joint": 0.25,
+      ".*_shoulder_pitch_joint": 0.25,
+      ".*_shoulder_roll_joint": 0.25,
+      ".*_shoulder_yaw_joint": 0.25,
+      ".*_elbow_joint": 0.25,
+    }
 
   return cfg
 
@@ -164,14 +168,14 @@ def unitree_g1_rough_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCf
     actuators=(
       ElectricalMotorActuatorCfg(
         target_names_expr=(
-          "left_hip_pitch",
-          "right_hip_pitch",
-          "left_hip_roll",
-          "right_hip_roll",
-          "left_hip_yaw",
-          "right_hip_yaw",
-          "left_knee",
-          "right_knee",
+          "left_hip_pitch_joint",
+          "right_hip_pitch_joint",
+          "left_hip_roll_joint",
+          "right_hip_roll_joint",
+          "left_hip_yaw_joint",
+          "right_hip_yaw_joint",
+          "left_knee_joint",
+          "right_knee_joint",
         ),
         motor_spec=hip_knee_motor,
         stiffness=200.0,
@@ -182,20 +186,18 @@ def unitree_g1_rough_electric_env_cfg(play: bool = False) -> ManagerBasedRlEnvCf
       ),
       ElectricalMotorActuatorCfg(
         target_names_expr=(
-          "left_ankle_pitch",
-          "right_ankle_pitch",
-          "left_ankle_roll",
-          "right_ankle_roll",
-          "left_shoulder_pitch",
-          "right_shoulder_pitch",
-          "left_shoulder_roll",
-          "right_shoulder_roll",
-          "left_shoulder_yaw",
-          "right_shoulder_yaw",
-          "left_elbow_pitch",
-          "right_elbow_pitch",
-          "left_elbow_roll",
-          "right_elbow_roll",
+          "left_ankle_pitch_joint",
+          "right_ankle_pitch_joint",
+          "left_ankle_roll_joint",
+          "right_ankle_roll_joint",
+          "left_shoulder_pitch_joint",
+          "right_shoulder_pitch_joint",
+          "left_shoulder_roll_joint",
+          "right_shoulder_roll_joint",
+          "left_shoulder_yaw_joint",
+          "right_shoulder_yaw_joint",
+          "left_elbow_joint",
+          "right_elbow_joint",
         ),
         motor_spec=ankle_arm_motor,
         stiffness=200.0,
