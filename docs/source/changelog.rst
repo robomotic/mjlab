@@ -12,6 +12,14 @@ Added
   classical PID control integration with mjlab. Includes standalone ``PidControlAction``
   action term that computes control forces from observations using tunable PID gains.
   Works with ``--agent zero`` for visualizing hand-tuned control policies without training.
+- **Electrical cartpole with real-time metrics**: Added ``Mjlab-Cartpole-Balance-Electric``
+  task demonstrating electrical motor actuator with battery visualization. Features custom
+  servo motor specification (50 Nm stall torque, 48V, 0.5Ω resistance) and real-time
+  electrical metrics (motor current, voltage, power, temperature, back-EMF, battery SOC,
+  battery voltage, current, power, temperature). Uses PID control with electrical motor
+  physics and battery dynamics. Motor and battery automatically discovered from XML via
+  ``auto_discover_motors`` and ``auto_battery`` flags. Run with: ``uv run play
+  Mjlab-Cartpole-Balance-Electric --agent zero``.
 - **Motor database with electrical characteristics** (Phase 1): Added comprehensive
   motor database infrastructure for realistic electrical and thermal motor modeling.
   Includes ``MotorSpecification`` dataclass with electrical properties (resistance,

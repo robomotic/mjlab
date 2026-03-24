@@ -2578,6 +2578,10 @@ When running G1-Electric with Viser viewer, users see real-time plots of all ele
 - ✅ `src/mjlab/tasks/velocity/config/g1/env_cfgs_electric.py` (~250 lines): G1-Electric env
 - ✅ `src/mjlab/tasks/velocity/config/g1/README_ELECTRIC.md`: Usage documentation
 - ✅ `examples/electrical_metrics_viz_simple.py` (219 lines): Terminal demo
+- ✅ `src/mjlab/tasks/cartpole/cartpole_electric.xml`: Cartpole with electrical motor and battery specs
+- ✅ `src/mjlab/motor_database/motors/cartpole_servo_motor.json`: Custom 50 Nm servo motor spec
+- ✅ `src/mjlab/tasks/cartpole/cartpole_env_cfg.py`: Added `cartpole_balance_electric_env_cfg()`
+- ✅ `Mjlab-Cartpole-Balance-Electric` task: Simple demo with PID control + electrical metrics
 - ✅ Updated `docs/source/changelog.rst` with Phase 6 entry
 
 ### Validation
@@ -2588,6 +2592,10 @@ uv run pytest tests/test_electrical_metrics_advanced.py -v
 
 # Run G1-Electric demo
 uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric --agent zero --viewer viser
+# Open browser to http://localhost:8080 → Metrics tab
+
+# Run Cartpole-Electric demo (simpler, educational example)
+uv run play Mjlab-Cartpole-Balance-Electric --agent zero
 # Open browser to http://localhost:8080 → Metrics tab
 
 # Terminal-based demo

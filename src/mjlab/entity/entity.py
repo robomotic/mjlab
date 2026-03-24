@@ -231,6 +231,7 @@ class Entity:
         damping=10.0,
         saturation_effort=motor_spec.peak_torque,
         velocity_limit=motor_spec.no_load_speed,
+        effort_limit=motor_spec.continuous_torque,
       )
       actuators.append(actuator_cfg)
 

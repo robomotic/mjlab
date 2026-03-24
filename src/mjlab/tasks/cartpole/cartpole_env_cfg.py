@@ -18,7 +18,8 @@ from mjlab.envs.mdp import (
   reset_joints_by_offset,
   time_out,
 )
-from mjlab.envs.mdp.actions import JointEffortActionCfg
+from mjlab.envs.mdp.actions import JointEffortActionCfg, PidControlActionCfg
+from mjlab.envs.mdp.metrics import electrical_metrics_preset
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import (
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
 
 _CARTPOLE_XML: Path = Path(__file__).parent / "cartpole.xml"
+_CARTPOLE_ELECTRIC_XML: Path = Path(__file__).parent / "cartpole_electric.xml"
 _CART_CFG = SceneEntityCfg("cartpole", joint_names=("slider",))
 _HINGE_CFG = SceneEntityCfg("cartpole", joint_names=("hinge_1",))
 
@@ -307,3 +309,98 @@ def cartpole_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     num_steps_per_env=32,
     max_iterations=500,
   )
+
+
+def cartpole_balance_pid_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Cartpole balance environment with PID controller.
+
+  This variant uses a classical PID controller instead of a learned policy.
+  The controller reads observations and computes control forces automatically,
+  making it work with dummy agents (--agent zero).
+
+  Args:
+    play: If True, configure for play mode (long episodes, no corruption).
+
+  Returns:
+    Environment configuration with PID control action.
+  """
+  cfg = _make_env_cfg(swing_up=False)
+
+  # Replace effort action with PID control action
+  cfg.actions = {
+    "pid": PidControlActionCfg(
+      entity_name="cartpole",
+      joint_names=("slider",),
+      # PID gains (tuned for inverted pendulum balance)
+      kp_angle=100.0,  # Strong angle correction (increased - most important!)
+      kd_angle=20.0,  # Increased damping for stability
+      kp_position=5.0,  # Gentle cart centering (reduced - secondary objective)
+      kd_velocity=8.0,  # Moderate velocity damping
+      ki_angle=0.0,  # No integral (disabled for stability)
+      # Limits
+      integral_limit=10.0,
+      output_limit=100.0,
+      # Targets
+      target_angle=0.0,  # Upright
+      target_position=0.0,  # Center
+      # Observation keys
+      angle_obs_name="pole_angle",
+      angle_vel_obs_name="pole_vel",
+      position_obs_name="cart_pos",
+      velocity_obs_name="cart_vel",
+    ),
+  }
+
+  if play:
+    cfg.episode_length_s = 1e10
+    cfg.observations["actor"].enable_corruption = False
+
+  return cfg
+
+
+def cartpole_balance_electric_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Cartpole balance with electrical servo motor and real-time metrics.
+
+  This variant uses an electrical motor actuator with realistic electrical and
+  thermal dynamics, plus real-time visualization of power, current, and torque.
+
+  Args:
+    play: If True, configure for play mode (long episodes, no corruption).
+
+  Returns:
+    Environment configuration with electrical motor and metrics.
+  """
+  # Start from base PID controller configuration
+  cfg = cartpole_balance_pid_env_cfg(play=False)
+
+  # Replace entity XML to use electrical motor version
+  # Auto-discovery will automatically create ElectricalMotorActuator from XML
+  def _get_electric_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(_CARTPOLE_ELECTRIC_XML))
+
+  cfg.scene.entities = {
+    "cartpole": EntityCfg(
+      spec_fn=_get_electric_spec,
+      init_state=_BALANCE_INIT,
+      # Let auto_discover_motors create the electrical actuator from XML
+      auto_discover_motors=True,
+    )
+  }
+
+  # Enable battery auto-discovery from XML
+  cfg.scene.auto_battery = True
+
+  # Add electrical metrics for real-time visualization
+  cfg.metrics = {
+    **electrical_metrics_preset(entity_name="cartpole"),  # Match entity name
+  }
+
+  if play:
+    cfg.episode_length_s = 1e10
+    cfg.observations["actor"].enable_corruption = False
+
+  return cfg
