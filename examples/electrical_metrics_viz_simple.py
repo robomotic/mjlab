@@ -186,7 +186,7 @@ def main():
     initial_soc = 100.0
     soc_drop = initial_soc - final_soc
 
-    print(f"\nFinal Statistics:")
+    print("\nFinal Statistics:")
     print(f"  Initial SOC: {initial_soc:.1f}%")
     print(f"  Final SOC: {final_soc:.1f}%")
     print(f"  SOC drop: {soc_drop:.3f}%")
@@ -198,7 +198,7 @@ def main():
   if actuator.current is not None:
     avg_current = torch.mean(torch.abs(actuator.current)).item()
     max_current = torch.max(torch.abs(actuator.current)).item()
-    print(f"\nMotor Statistics:")
+    print("\nMotor Statistics:")
     print(f"  Average current: {avg_current:.2f} A")
     print(f"  Peak current: {max_current:.2f} A")
     if actuator.winding_temperature is not None:
