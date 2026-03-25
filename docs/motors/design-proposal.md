@@ -470,49 +470,100 @@ This allows users to:
 ```python
 @dataclass
 class MotorSpecification:
-    # Identity
+    # ============================================================================
+    # REQUIRED FIELDS (14 total - physics-critical parameters)
+    # ============================================================================
+
+    # Identity (required)
     motor_id: str                              # "unitree_7520_14"
     manufacturer: str                          # "Unitree"
     model: str                                 # "7520-14"
 
-    # 3D Assets
-    step_file: Optional[str]                   # Path to STEP file
-    stl_file: Optional[str]                    # Path to STL file
-
-    # Mechanical Properties
-    gear_ratio: float                          # 14.5
-    reflected_inertia: float                   # kg⋅m² (after gearbox)
-    rotation_angle_range: tuple[float, float]  # (min, max) radians
-
-    # Electrical Properties
+    # Electrical Properties (required - motor-specific)
     voltage_range: tuple[float, float]         # (min, max) V
     resistance: float                          # Ω (winding resistance)
     inductance: float                          # H (winding inductance)
     motor_constant_kt: float                   # N⋅m/A (torque constant)
     motor_constant_ke: float                   # V⋅s/rad (back-EMF constant)
 
-    # Performance Characteristics
-    stall_torque: float                        # N⋅m (at zero speed)
+    # Performance Characteristics (required - motor-specific)
     peak_torque: float                         # N⋅m (instantaneous max)
-    continuous_torque: float                   # N⋅m (continuous rating)
     no_load_speed: float                       # rad/s (at zero torque)
-    no_load_current: float                     # A
-    stall_current: float                       # A
-    operating_current: float                   # A (nominal)
 
-    # Thermal Properties
+    # Thermal Properties (required - motor-specific)
     thermal_resistance: float                  # °C/W (junction to ambient)
     thermal_time_constant: float               # s (first-order model)
     max_winding_temperature: float             # °C
-    ambient_temperature: float                 # °C
 
-    # Feedback & Control
-    encoder_resolution: int                    # counts/rev
-    encoder_type: str                          # "incremental" | "absolute"
-    feedback_sensors: list[str]                # ["position", "velocity", "current"]
-    protocol: str                              # "PWM" | "CAN" | "UART"
-    protocol_params: dict                      # Protocol-specific config
+    # ============================================================================
+    # OPTIONAL FIELDS (19 total - metadata and future enhancements)
+    # ============================================================================
+
+    # Electrical Properties (optional - additional characteristics)
+    number_of_pole_pairs: int | None = None    # Pole pairs for commutation frequency
+                                               # Example: 7 for Maxon EC-i motors
+    commutation: str | None = None             # "Hall" | "Encoder" | "Sensorless"
+                                               # Metadata for control compatibility
+
+    # Performance Characteristics (optional - additional limits)
+    max_speed: float | None = None             # rad/s (bearing/mechanical limit)
+                                               # Different from no_load_speed (electrical)
+
+    # 3D Assets (optional)
+    step_file: str | None = None               # Path to STEP CAD file
+    stl_file: str | None = None                # Path to STL mesh file
+
+    # Mechanical Properties (optional - with defaults)
+    gear_ratio: float = 1.0                    # Gear reduction ratio (1.0 = direct drive)
+    reflected_inertia: float = 0.0             # kg⋅m² (after gearbox)
+    rotation_angle_range: tuple[float, float] = (-3.14159, 3.14159)  # (min, max) radians
+    weight: float = 0.0                        # kg (motor mass)
+                                               # Example: Maxon EC-i 40: 0.390 kg
+    friction_static: float = 0.0               # N⋅m (Coulomb friction)
+    friction_dynamic: float = 0.0              # N⋅m⋅s/rad (viscous damping)
+
+    # Performance Characteristics (optional - with defaults)
+    stall_torque: float = 10.0                 # N⋅m (at zero speed)
+    continuous_torque: float = 10.0            # N⋅m (continuous rating)
+    no_load_current: float = 0.5               # A
+    stall_current: float = 10.0                # A
+    operating_current: float = 3.0             # A (nominal)
+
+    # Thermal Properties (optional - with defaults)
+    ambient_temperature: float = 25.0          # °C (room temperature)
+
+    # Feedback & Control (optional - with defaults)
+    encoder_resolution: int = 2048             # counts/rev
+    encoder_type: str = "incremental"          # "incremental" | "absolute"
+    feedback_sensors: list[str] | None = None  # Default: ["position", "velocity"]
+    protocol: str = "PWM"                      # "PWM" | "CAN" | "UART"
+    protocol_params: dict | None = None        # Protocol-specific config
 ```
+
+**Field Categories:**
+
+1. **Required Fields (14)** - Physics-critical parameters used directly in simulation:
+   - Identity (3): `motor_id`, `manufacturer`, `model`
+   - Electrical Properties (5): `voltage_range`, `resistance`, `inductance`, `motor_constant_kt`, `motor_constant_ke`
+   - Performance Characteristics (2): `peak_torque`, `no_load_speed`
+   - Thermal Properties (3): `thermal_resistance`, `thermal_time_constant`, `max_winding_temperature`
+   - Must be specified in every motor JSON file
+   - Used in RL circuit dynamics, thermal models, and DC motor saturation
+
+2. **Optional Fields (19)** - Metadata and future enhancements:
+   - All have sensible defaults or `None`
+   - Not currently used in physics equations
+   - Enable richer motor specifications from datasheets
+   - Reserved for future physics extensions (friction, commutation, mass distribution)
+
+**Future Physics Extensions:**
+The following optional fields are available but not currently used in simulations:
+- `number_of_pole_pairs`: Reserved for BLDC/PMSM commutation frequency modeling
+- `commutation`: Metadata for control system compatibility
+- `max_speed`: Reserved for mechanical speed limit enforcement beyond electrical `no_load_speed`
+- `weight`: Reserved for total actuator mass calculations
+- `friction_static`: Reserved for Coulomb friction in torque output
+- `friction_dynamic`: Reserved for velocity-proportional friction
 
 **Example JSON** (`motors/unitree_7520_14.json`):
 ```json

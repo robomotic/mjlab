@@ -8,6 +8,13 @@ Upcoming version (not yet released)
 Added
 ^^^^^
 
+- Extended ``MotorSpecification`` with 6 new optional fields from Maxon/Faulhaber
+  datasheets: ``number_of_pole_pairs`` (int, for commutation frequency),
+  ``commutation`` (str, sensor type), ``max_speed`` (float, bearing limit),
+  ``weight`` (float, kg), ``friction_static`` (float, N⋅m), and ``friction_dynamic``
+  (float, N⋅m⋅s/rad). All fields are optional with sensible defaults and not currently
+  used in physics equations (reserved for future enhancements). No breaking changes
+  to existing motor specifications.
 - **PID-controlled cartpole**: Added ``Mjlab-Cartpole-Balance-PID`` task demonstrating
   classical PID control integration with mjlab. Includes standalone ``PidControlAction``
   action term that computes control forces from observations using tunable PID gains.

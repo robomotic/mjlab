@@ -23,12 +23,18 @@ def test_motor_spec_creation():
     motor_id="test_motor",
     manufacturer="TestCorp",
     model="TEST-1",
-    gear_ratio=10.0,
-    reflected_inertia=0.001,
+    voltage_range=(0.0, 24.0),
     resistance=0.5,
     inductance=0.0001,
     motor_constant_kt=0.1,
     motor_constant_ke=0.1,
+    peak_torque=15.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
+    gear_ratio=10.0,
+    reflected_inertia=0.001,
     stall_torque=15.0,
     continuous_torque=12.0,
   )
@@ -47,6 +53,16 @@ def test_motor_spec_optional_fields():
     motor_id="minimal_motor",
     manufacturer="MinCorp",
     model="MIN-1",
+    voltage_range=(0.0, 24.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    peak_torque=10.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
   )
 
   # Check defaults are applied
@@ -55,6 +71,7 @@ def test_motor_spec_optional_fields():
   assert motor.resistance == 1.0
   assert motor.inductance == 0.001
   assert motor.stall_torque == 10.0
+  assert motor.ambient_temperature == 25.0
   assert motor.feedback_sensors == ["position", "velocity"]
   assert motor.protocol_params == {}
   assert motor.step_file is None
@@ -67,8 +84,17 @@ def test_motor_spec_json_roundtrip():
     motor_id="roundtrip_test",
     manufacturer="Test",
     model="RT-1",
-    gear_ratio=5.0,
+    voltage_range=(0.0, 24.0),
     resistance=0.8,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    peak_torque=10.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
+    gear_ratio=5.0,
     feedback_sensors=["position", "velocity", "current"],
     protocol_params={"baudrate": 115200},
   )
@@ -96,11 +122,31 @@ def test_motor_spec_mutable_defaults():
     motor_id="motor1",
     manufacturer="Test",
     model="M1",
+    voltage_range=(0.0, 24.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    peak_torque=10.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
   )
   motor2 = MotorSpecification(
     motor_id="motor2",
     manufacturer="Test",
     model="M2",
+    voltage_range=(0.0, 24.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    peak_torque=10.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
   )
 
   # Modify motor1's list
@@ -123,8 +169,17 @@ def test_load_from_file(tmp_path):
     "motor_id": "file_test_motor",
     "manufacturer": "FileTest",
     "model": "FT-1",
-    "gear_ratio": 8.0,
+    "voltage_range": [0.0, 24.0],
     "resistance": 0.6,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
+    "gear_ratio": 8.0,
   }
 
   motor_file = tmp_path / "test_motor.json"
@@ -172,6 +227,16 @@ def test_load_from_url():
     "motor_id": "url_motor",
     "manufacturer": "URLTest",
     "model": "URL-1",
+    "voltage_range": [0.0, 24.0],
+    "resistance": 1.0,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
     "gear_ratio": 7.0,
   }
 
@@ -196,6 +261,16 @@ def test_search_path_priority(tmp_path):
     "motor_id": "unitree_7520_14",  # Same ID as builtin
     "manufacturer": "CustomManufacturer",  # Different manufacturer
     "model": "CUSTOM",
+    "voltage_range": [0.0, 24.0],
+    "resistance": 1.0,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
     "gear_ratio": 999.0,  # Easily distinguishable value
   }
 
@@ -291,6 +366,16 @@ def test_load_with_explicit_path(tmp_path):
     "motor_id": "explicit_path_motor",
     "manufacturer": "PathTest",
     "model": "PT-1",
+    "voltage_range": [0.0, 24.0],
+    "resistance": 1.0,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
   }
 
   custom_dir = tmp_path / "explicit"
@@ -318,3 +403,62 @@ def test_no_source_error():
   """Test error when no source is provided."""
   with pytest.raises(ValueError, match="Must provide"):
     load_motor_spec()
+
+
+def test_motor_spec_new_fields():
+  """Test new optional fields from Maxon/Faulhaber datasheets."""
+  motor = MotorSpecification(
+    motor_id="maxon_ec_i_40",
+    manufacturer="Maxon",
+    model="EC-i 40",
+    voltage_range=(0.0, 24.0),
+    resistance=0.5,
+    inductance=0.0001,
+    motor_constant_kt=0.0354,
+    motor_constant_ke=0.0354,
+    peak_torque=0.6,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
+    # New fields
+    number_of_pole_pairs=7,
+    commutation="Hall",
+    max_speed=12000.0 * (2 * 3.14159 / 60),  # 12000 RPM -> rad/s
+    weight=0.390,
+    friction_static=0.001,
+    friction_dynamic=0.0001,
+  )
+
+  assert motor.number_of_pole_pairs == 7
+  assert motor.commutation == "Hall"
+  assert motor.max_speed > motor.no_load_speed
+  assert motor.weight == 0.390
+  assert motor.friction_static == 0.001
+  assert motor.friction_dynamic == 0.0001
+
+
+def test_motor_spec_new_fields_defaults():
+  """Test that new fields have correct defaults."""
+  motor = MotorSpecification(
+    motor_id="minimal",
+    manufacturer="Test",
+    model="M1",
+    voltage_range=(0.0, 24.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    peak_torque=10.0,
+    no_load_speed=10.0,
+    thermal_resistance=5.0,
+    thermal_time_constant=300.0,
+    max_winding_temperature=120.0,
+  )
+
+  assert motor.number_of_pole_pairs is None
+  assert motor.commutation is None
+  assert motor.max_speed is None
+  assert motor.weight == 0.0
+  assert motor.friction_static == 0.0
+  assert motor.friction_dynamic == 0.0
