@@ -63,6 +63,62 @@ When loading a motor by ID, mjlab searches in this order:
 4. **Environment variable**: `$MJLAB_MOTOR_PATH` (colon-separated paths)
 5. **Added paths**: Paths added via `add_motor_database_path()`
 6. **Built-in database**: `<mjlab_install>/motor_database/motors/`
+7. **Remote repositories**: GitHub fallback (with automatic caching)
+
+### Remote Repository Support
+
+**Automatic GitHub Fallback**:
+
+mjlab automatically fetches motor specifications from community repositories when not found locally:
+
+```python
+# Automatically fetches from GitHub if not found locally
+motor = load_motor_spec("faulhaber_2264w024bp4")
+# Downloads from: https://raw.githubusercontent.com/robomotic/mujoco-motors/
+#                 master/motor_assets/faulhaber/faulhaber_2264w024bp4.json
+```
+
+**How It Works:**
+1. Searches all local paths first (fast)
+2. If not found, extracts manufacturer from motor_id (e.g., "faulhaber" from "faulhaber_2264w024bp4")
+3. Constructs GitHub URL: `{base_url}/{manufacturer}/{motor_id}.json`
+4. Downloads and caches at `~/.mjlab/cache/motors/`
+5. Subsequent loads are instant (from cache)
+
+**Remote Repository Configuration:**
+
+The default remote repository is configured in `database.py`:
+```python
+REMOTE_MOTOR_REPOSITORIES = [
+  "https://raw.githubusercontent.com/robomotic/mujoco-motors/master/motor_assets"
+]
+```
+
+### Cache Management
+
+**Cache Location**: `~/.mjlab/cache/motors/`
+
+Motor specifications downloaded from remote repositories are cached locally using MD5 hashes of the source URL as filenames.
+
+**Clearing Cache:**
+```bash
+# Remove all cached motors
+rm -rf ~/.mjlab/cache/motors/
+
+# Remove specific cached motor (find by inspecting cache)
+ls -lh ~/.mjlab/cache/motors/
+rm ~/.mjlab/cache/motors/<hash>.json
+```
+
+**Cache Benefits:**
+- ⚡ Instant loading after first download
+- 🔌 Offline access to previously downloaded motors
+- 🌐 No repeated network requests
+
+**When to Clear Cache:**
+- Motor specification updated on GitHub
+- Corrupted cache files
+- Disk space cleanup
 
 ### Configuration
 
@@ -71,24 +127,8 @@ When loading a motor by ID, mjlab searches in this order:
 # Add multiple motor database paths
 export MJLAB_MOTOR_PATH="/path/to/motors:/another/path/to/motors"
 
-# Point to cloned GitHub repo
-export MJLAB_MOTOR_PATH="$HOME/repos/mjlab-motors/community:$MJLAB_MOTOR_PATH"
-**Configuration File** (`~/.mjlab/config.yaml`):
-```yaml
-motor_database:
-  search_paths:
-    - /path/to/custom/motors
-    - ~/projects/robot/motors
-  remote_repositories:
-      branch: main
-      cache_dir: ~/.mjlab/cache/motors/community
-```
-```python
-from mjlab.motor_database import MotorDatabaseConfig
-
-config = MotorDatabaseConfig.get()
-config.add_search_path("/path/to/motors")
-config.add_remote_repository(
+# Point to cloned GitHub repo for offline access
+export MJLAB_MOTOR_PATH="$HOME/repos/mujoco-motors/motor_assets:$MJLAB_MOTOR_PATH"
 ```
 
 ### External Repository Structure
