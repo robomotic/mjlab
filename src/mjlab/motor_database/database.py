@@ -14,6 +14,11 @@ BUILTIN_MOTORS_PATH = Path(__file__).parent / "motors"
 # Global search paths (can be extended via add_motor_database_path)
 _SEARCH_PATHS: list[Path] = []
 
+# Remote motor repositories (checked as fallback after local paths)
+REMOTE_MOTOR_REPOSITORIES = [
+  "https://raw.githubusercontent.com/robomotic/mujoco-motors/master/motor_assets"
+]
+
 
 def get_default_search_paths() -> list[Path]:
   """Get default motor database search paths.
@@ -24,6 +29,7 @@ def get_default_search_paths() -> list[Path]:
   3. Environment variable (MJLAB_MOTOR_PATH, colon-separated)
   4. Added paths (via add_motor_database_path())
   5. Built-in database (mjlab package installation)
+  6. Remote repositories (GitHub fallback, see REMOTE_MOTOR_REPOSITORIES)
 
   Returns:
       List of Path objects for motor database directories.
@@ -108,6 +114,15 @@ def load_motor_spec(
 
       >>> # Load from file
       >>> motor = load_motor_spec(file="/absolute/path/motor.json")
+
+      >>> # Automatic GitHub fallback (if not found locally)
+      >>> motor = load_motor_spec("dynamixel_xl330_m288_t")
+      >>> # Fetches from: https://raw.githubusercontent.com/robomotic/mujoco-motors/
+      >>> #                master/motor_assets/dynamixel/dynamixel_xl330_m288_t.json
+
+  Search order for motor_id:
+      1. Local paths (user, project, env var, added, built-in)
+      2. Remote repositories (GitHub with caching)
   """
   # Count number of sources provided
   sources_provided = sum(x is not None for x in [motor_id, path, url, file])
@@ -144,9 +159,15 @@ def load_motor_spec(
         except FileNotFoundError:
           continue
 
-      raise FileNotFoundError(
-        f"Motor '{motor_id}' not found in any search path. Searched: {search_paths}"
-      )
+      # Try remote repositories as fallback
+      try:
+        return _try_remote_repositories(motor_id)
+      except Exception as e:
+        # If remote fetch fails, raise original error with local paths
+        raise FileNotFoundError(
+          f"Motor '{motor_id}' not found in local paths or remote repositories. "
+          f"Searched local: {search_paths}, Remote: {REMOTE_MOTOR_REPOSITORIES}"
+        ) from e
 
   raise ValueError("Must provide motor_id, file, or url")
 
@@ -231,3 +252,67 @@ def _load_from_path(motor_id: str, search_path: Path) -> MotorSpecification:
     return _load_from_file(glob_matches[0])
 
   raise FileNotFoundError(f"Motor '{motor_id}' not found in {search_path}")
+
+
+def _extract_manufacturer(motor_id: str) -> str | None:
+  """Extract manufacturer name from motor_id.
+
+  Conventions:
+  - motor_id format: {manufacturer}_{model_info}
+  - Example: "dynamixel_xl330_m288_t" -> "dynamixel"
+  - Example: "unitree_7520_14" -> "unitree"
+
+  Args:
+      motor_id: Motor ID string.
+
+  Returns:
+      Manufacturer name (lowercase) or None if cannot be determined.
+  """
+  if "_" not in motor_id:
+    return None
+  return motor_id.split("_")[0].lower()
+
+
+def _try_remote_repositories(motor_id: str) -> MotorSpecification:
+  """Try loading motor spec from remote repositories.
+
+  This function attempts to fetch motor specifications from configured
+  remote repositories (e.g., GitHub). Motor files are organized by
+  manufacturer subdirectories.
+
+  URL pattern: {base_url}/{manufacturer}/{motor_id}.json
+
+  Example:
+      motor_id="dynamixel_xl330_m288_t"
+      -> https://raw.githubusercontent.com/.../dynamixel/dynamixel_xl330_m288_t.json
+
+  Args:
+      motor_id: Motor ID to fetch.
+
+  Returns:
+      MotorSpecification instance.
+
+  Raises:
+      Exception: If motor cannot be fetched from any remote repository.
+  """
+  manufacturer = _extract_manufacturer(motor_id)
+
+  for base_url in REMOTE_MOTOR_REPOSITORIES:
+    # Try with manufacturer subdirectory if we can extract it
+    if manufacturer:
+      url = f"{base_url}/{manufacturer}/{motor_id}.json"
+      try:
+        return _load_from_url(url)
+      except Exception:
+        pass
+
+    # Try flat structure (motor_id directly under base_url)
+    url = f"{base_url}/{motor_id}.json"
+    try:
+      return _load_from_url(url)
+    except Exception:
+      pass
+
+  raise FileNotFoundError(
+    f"Motor '{motor_id}' not found in remote repositories: {REMOTE_MOTOR_REPOSITORIES}"
+  )

@@ -8,6 +8,13 @@ Upcoming version (not yet released)
 Added
 ^^^^^
 
+- **Remote motor repository support**: ``load_motor_spec()`` now automatically falls back
+  to GitHub when a motor is not found locally. Motor specifications are fetched from
+  ``https://github.com/robomotic/mujoco-motors`` and cached locally at
+  ``~/.mjlab/cache/motors/`` for offline access. This enables seamless loading of
+  community-maintained motor specifications without manual downloads. Example:
+  ``load_motor_spec("dynamixel_xl330_m288_t")`` automatically fetches from
+  ``motor_assets/dynamixel/dynamixel_xl330_m288_t.json``.
 - Extended ``MotorSpecification`` with 6 new optional fields from Maxon/Faulhaber
   datasheets: ``number_of_pole_pairs`` (int, for commutation frequency),
   ``commutation`` (str, sensor type), ``max_speed`` (float, bearing limit),

@@ -217,7 +217,9 @@ def test_load_from_builtin_alternate_motor():
 
 def test_load_motor_not_found():
   """Test proper error when motor doesn't exist."""
-  with pytest.raises(FileNotFoundError, match="not found in any search path"):
+  with pytest.raises(
+    FileNotFoundError, match="not found in local paths or remote repositories"
+  ):
     load_motor_spec("nonexistent_motor_12345")
 
 
@@ -462,3 +464,81 @@ def test_motor_spec_new_fields_defaults():
   assert motor.weight == 0.0
   assert motor.friction_static == 0.0
   assert motor.friction_dynamic == 0.0
+
+
+def test_extract_manufacturer():
+  """Test manufacturer extraction from motor_id."""
+  from mjlab.motor_database.database import _extract_manufacturer
+
+  # Standard format: manufacturer_model_variant
+  assert _extract_manufacturer("dynamixel_xl330_m288_t") == "dynamixel"
+  assert _extract_manufacturer("unitree_7520_14") == "unitree"
+  assert _extract_manufacturer("maxon_ec_i_40") == "maxon"
+
+  # No underscore - cannot extract
+  assert _extract_manufacturer("motor123") is None
+
+
+def test_remote_repository_fallback():
+  """Test loading motor from remote GitHub repository."""
+  from mjlab.motor_database.database import _try_remote_repositories
+
+  motor_data = {
+    "motor_id": "github_test_motor",
+    "manufacturer": "GitHubTest",
+    "model": "GT-1",
+    "voltage_range": [0.0, 24.0],
+    "resistance": 1.0,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
+  }
+
+  # Mock urllib.request.urlopen for remote fetch
+  mock_response = MagicMock()
+  mock_response.read.return_value = json.dumps(motor_data).encode()
+  mock_response.__enter__ = MagicMock(return_value=mock_response)
+  mock_response.__exit__ = MagicMock(return_value=False)
+
+  with patch("urllib.request.urlopen", return_value=mock_response):
+    motor = _try_remote_repositories("github_test_motor")
+
+  assert motor.motor_id == "github_test_motor"
+  assert motor.manufacturer == "GitHubTest"
+
+
+def test_load_motor_with_remote_fallback():
+  """Test load_motor_spec falls back to remote when not found locally."""
+  motor_data = {
+    "motor_id": "remote_motor",
+    "manufacturer": "RemoteTest",
+    "model": "RM-1",
+    "voltage_range": [0.0, 24.0],
+    "resistance": 1.0,
+    "inductance": 0.001,
+    "motor_constant_kt": 0.1,
+    "motor_constant_ke": 0.1,
+    "peak_torque": 10.0,
+    "no_load_speed": 10.0,
+    "thermal_resistance": 5.0,
+    "thermal_time_constant": 300.0,
+    "max_winding_temperature": 120.0,
+  }
+
+  # Mock remote fetch
+  mock_response = MagicMock()
+  mock_response.read.return_value = json.dumps(motor_data).encode()
+  mock_response.__enter__ = MagicMock(return_value=mock_response)
+  mock_response.__exit__ = MagicMock(return_value=False)
+
+  with patch("urllib.request.urlopen", return_value=mock_response):
+    # Motor doesn't exist locally, should fall back to remote
+    motor = load_motor_spec("remote_motor")
+
+  assert motor.motor_id == "remote_motor"
+  assert motor.manufacturer == "RemoteTest"
