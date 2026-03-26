@@ -1,0 +1,256 @@
+# 🚀 Running MjLab Notebooks Locally on macOS
+
+## Complete Setup Guide for Beginners
+
+### Prerequisites
+- macOS computer (Apple Silicon or Intel)
+- Terminal app (built into macOS)
+- Internet connection
+
+---
+
+## Step 1: Install Homebrew (if not already installed)
+
+Open Terminal and run:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Follow the on-screen instructions. After installation, you may need to run the commands it suggests to add Homebrew to your PATH.
+
+---
+
+## Step 2: Install uv (Python package manager)
+
+```bash
+brew install uv
+```
+
+Verify installation:
+```bash
+uv --version
+```
+
+---
+
+## Step 3: Clone the Repository
+
+Navigate to where you want to store the project (e.g., your Documents folder):
+
+```bash
+cd ~/Documents
+```
+
+Clone the repository from the correct branch:
+
+```bash
+git clone -b feature/motor-database-extension https://github.com/robomotic/mjlab.git
+```
+
+Enter the project directory:
+
+```bash
+cd mjlab
+```
+
+---
+
+## Step 4: Install Project Dependencies
+
+The project uses `uv` to manage dependencies. Simply run:
+
+```bash
+uv sync
+```
+
+This command will:
+- Create a virtual environment automatically
+- Install Python (if needed)
+- Install all required packages from `pyproject.toml`
+
+**Note**: This may take a few minutes on first run.
+
+---
+
+## Step 5: Install Jupyter Notebook Support
+
+Install Jupyter and related packages:
+
+```bash
+uv add --dev jupyter matplotlib ipywidgets
+```
+
+This adds:
+- `jupyter` - Notebook interface
+- `matplotlib` - Plotting library (already included, but ensures it's available)
+- `ipywidgets` - Interactive widgets for notebooks
+
+---
+
+## Step 6: Run the Tutorial Notebook
+
+Start Jupyter:
+
+```bash
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+```
+
+This will:
+1. Open your web browser automatically
+2. Display the notebook interface
+3. Load the tutorial notebook
+
+**Alternative**: To see all notebooks first:
+
+```bash
+uv run jupyter notebook notebooks/
+```
+
+Then navigate to `electrical/01_intro.ipynb` in the browser.
+
+---
+
+## 🎯 Quick Start Commands (All-in-One)
+
+If you already have `uv` and `git` installed:
+
+```bash
+# Navigate to your preferred directory
+cd ~/Documents
+
+# Clone repository
+git clone -b feature/motor-database-extension https://github.com/robomotic/mjlab.git
+cd mjlab
+
+# Install dependencies
+uv sync
+
+# Install Jupyter
+uv add --dev jupyter matplotlib ipywidgets
+
+# Run the tutorial
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+```
+
+---
+
+## 📝 Additional Commands
+
+### Run all notebooks in a browser interface:
+```bash
+uv run jupyter notebook
+```
+
+### Run JupyterLab (modern interface):
+```bash
+uv add --dev jupyterlab
+uv run jupyter lab
+```
+
+### Update dependencies:
+```bash
+uv sync --upgrade
+```
+
+### Run type checking (optional):
+```bash
+make type
+```
+
+### Run tests (optional):
+```bash
+make test
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Issue: "command not found: uv"
+**Solution**: Install uv using Homebrew:
+```bash
+brew install uv
+```
+
+### Issue: "command not found: git"
+**Solution**: Install Xcode Command Line Tools:
+```bash
+xcode-select --install
+```
+
+### Issue: Jupyter kernel not found
+**Solution**: Restart the Jupyter server:
+```bash
+# Press Ctrl+C to stop Jupyter, then restart:
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+```
+
+### Issue: Import errors in notebook
+**Solution**: Make sure you're running Jupyter via `uv run`:
+```bash
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+```
+
+### Issue: Port already in use
+**Solution**: Jupyter will automatically try the next available port (8889, 8890, etc.). Check the terminal output for the correct URL.
+
+---
+
+## 📚 What You Just Installed
+
+- **uv**: Modern Python package manager (faster than pip)
+- **mjlab**: The main simulation library
+- **jupyter**: Interactive notebook environment
+- **matplotlib**: Plotting and visualization
+- **torch**: PyTorch for GPU-accelerated computation
+- **mujoco**: Physics engine
+- Plus many other dependencies automatically managed by `uv`
+
+---
+
+## 🎓 Next Steps
+
+1. **Run the tutorial**: Execute cells in `01_intro.ipynb` by pressing `Shift+Enter`
+2. **Explore other notebooks**: Check `notebooks/humanoid_motor_demo.ipynb` and `notebooks/humanoid_motor_demo_easy.ipynb`
+3. **Read the docs**: See `docs/` folder for detailed documentation
+4. **Read CLAUDE.md**: Development workflow and coding standards
+
+---
+
+## 🆘 Getting Help
+
+- **Issues**: https://github.com/robomotic/mjlab/issues
+- **Development Guide**: See `CLAUDE.md` in the repository root
+- **Community**: Check the repository discussions
+
+---
+
+## 🔐 SSL Certificate Issues (macOS)
+
+### Issue: SSL certificate verification errors
+**Solution**: If you encounter SSL certificate errors when installing packages with `uv`, set this environment variable:
+
+```bash
+export UV_NATIVE_TLS=1
+```
+
+To make this permanent, add it to your shell configuration file.
+
+**For zsh (default on macOS Catalina and later):**
+```bash
+echo 'export UV_NATIVE_TLS=1' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**For bash (older macOS versions):**
+```bash
+echo 'export UV_NATIVE_TLS=1' >> ~/.bash_profile
+source ~/.bash_profile
+```
+
+Then retry the installation commands.
+
+---
+
+**You're all set!** 🎉 The notebook should now be running in your browser.
