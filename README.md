@@ -1,4 +1,4 @@
-![Project banner]("https://github.com/user-attachments/assets/bffe38cd-73c0-4ee7-8fb4-c7a3365b22ba")
+![Project banner](https://github.com/robomotic/mjlab/blob/feature/motor-database-extension/docs/source/_static/content/MjLabanner.png)
 
 # mjlab
 
