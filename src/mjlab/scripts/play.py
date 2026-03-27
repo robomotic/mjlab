@@ -153,16 +153,25 @@ def run_play(task_id: str, cfg: PlayConfig):
   if cfg.video_width is not None:
     env_cfg.viewer.width = cfg.video_width
 
-  render_mode = "rgb_array" if (TRAINED_MODE and cfg.video) else None
+  # Enable video recording for both trained and dummy agents
+  render_mode = "rgb_array" if cfg.video else None
+
+  # Create log directory for dummy agents if recording video
   if cfg.video and DUMMY_MODE:
-    print(
-      "[WARN] Video recording with dummy agents is disabled (no checkpoint/log_dir)."
-    )
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_dir = (Path("logs") / "play" / task_id / cfg.agent / timestamp).resolve()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] Recording videos to: {log_dir / 'videos' / 'play'}")
+
   env = ManagerBasedRlEnv(cfg=env_cfg, device=device, render_mode=render_mode)
 
-  if TRAINED_MODE and cfg.video:
+  if cfg.video:
     print("[INFO] Recording videos during play")
-    assert log_dir is not None  # log_dir is set in TRAINED_MODE block
+    assert (
+      log_dir is not None
+    )  # log_dir is set in either TRAINED_MODE or DUMMY_MODE block
     env = VideoRecorder(
       env,
       video_folder=log_dir / "videos" / "play",

@@ -222,6 +222,9 @@ uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --sin_frequency 2.0 --s
 
 # Compare with zero agent (no torque)
 uv run play Mjlab-Cartpole-Constant-Rotation --agent zero --viewer viser
+
+# Record video (saved to logs/play/{task}/{agent}/{timestamp}/videos/play/)
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --viewer viser --video --video_length 500
 ```
 
 This demonstrates:
@@ -229,6 +232,7 @@ This demonstrates:
 - Real-time metrics visualization (voltage, current, power, temperature)
 - Direct torque control (no PD feedback)
 - Battery state tracking (SOC, voltage sag, thermal heating)
+- Video recording with custom length and resolution
 
 ### Jupyter Notebooks (Colab Compatible)
 
