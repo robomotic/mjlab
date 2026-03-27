@@ -211,6 +211,81 @@ To contribute batteries, open a pull request to the repository.
 
 ## Examples
 
+### Running Examples Locally
+
+**Interactive G1 Humanoid with electrical motors and battery:**
+```bash
+# Run G1 humanoid with battery tracking
+uv run play Mjlab-Velocity-Flat-Unitree-G1-Electric --agent zero --viewer viser
+
+# Monitor battery metrics in real-time:
+# - State of Charge (SOC)
+# - Voltage sag under load
+# - Current draw from motors
+# - Battery temperature
+```
+
+This demonstrates:
+- Automatic battery loading from remote repository
+- Real-time battery state tracking (SOC, voltage, current, temperature)
+- Voltage feedback to electrical motors
+- Battery discharge and thermal heating
+- Integration with motor database
+
+### Jupyter Notebooks (Colab Compatible)
+
+**Tutorial 1: Motor Physics Fundamentals**
+- Notebook: [`notebooks/electrical/01_intro.ipynb`](../../../notebooks/electrical/01_intro.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/electrical/01_intro.ipynb)
+- Topics:
+  - Electrical motor modeling (voltage, current, back-EMF)
+  - Battery discharge and voltage sag
+  - Thermal modeling for motors and batteries
+  - Real-time metrics visualization
+
+**Tutorial 2: Motor Sizing with CartPole**
+- Notebook: [`notebooks/electrical/02_intro.ipynb`](../../../notebooks/electrical/02_intro.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/electrical/02_intro.ipynb)
+- Topics:
+  - Comparing different motor sizes
+  - Battery sizing for motor requirements
+  - Power consumption analysis
+  - Thermal limits and battery capacity
+
+**Humanoid Battery Demo (Automatic API)**
+- Notebook: [`notebooks/humanoid_motor_demo_easy.ipynb`](../../../notebooks/humanoid_motor_demo_easy.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/humanoid_motor_demo_easy.ipynb)
+- Topics:
+  - Unitree G1 humanoid with automatic battery discovery
+  - Battery discharge tracking (SOC, voltage, temperature)
+  - Voltage feedback affecting motor performance
+  - Integration with motor database
+  - 90% less code than manual approach
+
+**Running Locally:**
+```bash
+# Install Jupyter if not already installed
+uv add --dev jupyter matplotlib ipywidgets
+
+# Run Tutorial 1
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+
+# Run Tutorial 2
+uv run jupyter notebook notebooks/electrical/02_intro.ipynb
+
+# Run Humanoid Demo
+uv run jupyter notebook notebooks/humanoid_motor_demo_easy.ipynb
+```
+
+### Key Features Demonstrated
+
+All examples showcase:
+- ✅ **Auto-discovery** of batteries from XML custom tags
+- ✅ **Automatic** battery state tracking (SOC, voltage, current, temperature)
+- ✅ **Real-time** voltage feedback to motors
+- ✅ **Realistic** battery physics (discharge, voltage sag, thermal heating)
+- ✅ **Zero manual** physics - just load and step!
+
 ### Basic Battery Loading
 
 ```python
