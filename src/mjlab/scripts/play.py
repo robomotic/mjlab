@@ -21,7 +21,11 @@ from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
 
 @dataclass(frozen=True)
 class PlayConfig:
-  agent: Literal["zero", "random", "trained"] = "trained"
+  agent: Literal["zero", "random", "trained", "sin"] = "trained"
+  sin_frequency: float = 1.0
+  """Frequency for sin agent in Hz (default: 1 Hz = 1 cycle/sec)."""
+  sin_amplitude: float = 15.0
+  """Amplitude for sin agent in N⋅m (default: 15 N⋅m)."""
   registry_name: str | None = None
   wandb_run_path: str | None = None
   wandb_checkpoint_name: str | None = None
@@ -51,7 +55,7 @@ def run_play(task_id: str, cfg: PlayConfig):
   env_cfg = load_env_cfg(task_id, play=True)
   agent_cfg = load_rl_cfg(task_id)
 
-  DUMMY_MODE = cfg.agent in {"zero", "random"}
+  DUMMY_MODE = cfg.agent in {"zero", "random", "sin"}
   TRAINED_MODE = not DUMMY_MODE
 
   # Disable terminations if requested (useful for viewing motions).
@@ -178,7 +182,7 @@ def run_play(task_id: str, cfg: PlayConfig):
           return torch.zeros(action_shape, device=env.unwrapped.device)
 
       policy = PolicyZero()
-    else:
+    elif cfg.agent == "random":
 
       class PolicyRandom:
         def __call__(self, obs) -> torch.Tensor:
@@ -186,6 +190,44 @@ def run_play(task_id: str, cfg: PlayConfig):
           return 2 * torch.rand(action_shape, device=env.unwrapped.device) - 1
 
       policy = PolicyRandom()
+    elif cfg.agent == "sin":
+      import math
+
+      step_dt = env.unwrapped.step_dt
+
+      class PolicySin:
+        """Sinusoidal torque command generator.
+
+        Generates sine wave torque pattern to simulate periodic loads
+        like walking gaits. All action dimensions receive the same signal.
+        """
+
+        def __init__(self, shape, freq, amp, dt):
+          self.shape = shape
+          self.freq = freq
+          self.amp = amp
+          self.dt = dt
+          self.time = 0.0
+          self.omega = 2 * math.pi * freq
+
+        def __call__(self, obs) -> torch.Tensor:
+          del obs  # Unused - open-loop signal
+          # Generate sinusoidal torque command
+          value = math.sin(self.omega * self.time) * self.amp
+          actions = torch.full(
+            self.shape,
+            value,
+            dtype=torch.float32,
+            device=env.unwrapped.device,
+          )
+          self.time += self.dt
+          return actions
+
+        def reset(self):
+          """Reset time on environment reset."""
+          self.time = 0.0
+
+      policy = PolicySin(action_shape, cfg.sin_frequency, cfg.sin_amplitude, step_dt)
   else:
     runner_cls = load_runner_cls(task_id) or MjlabOnPolicyRunner
     runner = runner_cls(env, asdict(agent_cfg), device=device)

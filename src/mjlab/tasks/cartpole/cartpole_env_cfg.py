@@ -18,7 +18,12 @@ from mjlab.envs.mdp import (
   reset_joints_by_offset,
   time_out,
 )
-from mjlab.envs.mdp.actions import JointEffortActionCfg, PidControlActionCfg
+from mjlab.envs.mdp.actions import JointEffortActionCfg
+
+try:
+  from mjlab.envs.mdp.actions import PidControlActionCfg  # type: ignore
+except ImportError:
+  PidControlActionCfg = None  # type: ignore
 from mjlab.envs.mdp.metrics import electrical_metrics_preset
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.event_manager import EventTermCfg
@@ -326,11 +331,17 @@ def cartpole_balance_pid_env_cfg(
   Returns:
     Environment configuration with PID control action.
   """
+  if PidControlActionCfg is None:
+    raise NotImplementedError(
+      "PidControlActionCfg is not yet implemented. "
+      "Use cartpole_balance_env_cfg() or cartpole_constant_rotation_env_cfg() instead."
+    )
+
   cfg = _make_env_cfg(swing_up=False)
 
   # Replace effort action with PID control action
   cfg.actions = {
-    "pid": PidControlActionCfg(
+    "pid": PidControlActionCfg(  # type: ignore[misc]
       entity_name="cartpole",
       joint_names=("slider",),
       # PID gains (tuned for inverted pendulum balance)
@@ -374,8 +385,8 @@ def cartpole_balance_electric_env_cfg(
   Returns:
     Environment configuration with electrical motor and metrics.
   """
-  # Start from base PID controller configuration
-  cfg = cartpole_balance_pid_env_cfg(play=False)
+  # Start from base configuration (not PID since it's not implemented yet)
+  cfg = _make_env_cfg(swing_up=False)
 
   # Replace entity XML to use electrical motor version
   # Auto-discovery will automatically create ElectricalMotorActuator from XML
@@ -397,6 +408,91 @@ def cartpole_balance_electric_env_cfg(
   # Add electrical metrics for real-time visualization
   cfg.metrics = {
     **electrical_metrics_preset(entity_name="cartpole"),  # Match entity name
+  }
+
+  if play:
+    cfg.episode_length_s = 1e10
+    cfg.observations["actor"].enable_corruption = False
+
+  return cfg
+
+
+def cartpole_constant_rotation_env_cfg(
+  motor_xml_path: str,
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """CartPole with constant rotation for motor comparison.
+
+  Applies sinusoidal torque commands to demonstrate motor characteristics.
+  Does not use PID control - just direct torque commands.
+
+  Args:
+    motor_xml_path: Path to CartPole XML with specific motor configuration
+    play: If True, disable corruption and extend episode length
+
+  Returns:
+    Environment configuration with constant torque action.
+  """
+  from mjlab.actuator import ElectricalMotorActuatorCfg
+  from mjlab.motor_database import load_motor_spec
+
+  cfg = _make_env_cfg(swing_up=False)  # Base configuration
+
+  # Replace entity XML with custom motor variant
+  def _get_custom_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(motor_xml_path)
+
+  # Load motor spec from XML to manually configure with zero PD gains
+  # Parse XML to find motor spec name
+  spec = _get_custom_spec()
+  motor_spec_name = None
+  for custom_text in spec.texts:
+    if custom_text.name == "motor_slide_motor":
+      # Format is "motor_spec:motor_name"
+      motor_spec_name = custom_text.data.split(":")[-1]
+      break
+
+  if motor_spec_name is None:
+    raise ValueError(f"No motor_spec found in {motor_xml_path}")
+
+  motor_spec = load_motor_spec(motor_spec_name)
+
+  # Create electrical motor config with ZERO PD gains for direct torque control
+  electrical_motor_cfg = ElectricalMotorActuatorCfg(
+    target_names_expr=("slider",),
+    motor_spec=motor_spec,
+    saturation_effort=motor_spec.peak_torque,
+    effort_limit=motor_spec.peak_torque,
+    velocity_limit=motor_spec.no_load_speed,
+    stiffness=0.0,  # ZERO PD gains - direct torque control only
+    damping=0.0,
+  )
+
+  cfg.scene.entities = {
+    "cartpole": EntityCfg(
+      spec_fn=_get_custom_spec,
+      init_state=_BALANCE_INIT,
+      articulation=EntityArticulationInfoCfg(
+        actuators=(electrical_motor_cfg,),
+      ),
+    )
+  }
+
+  # Enable battery tracking
+  cfg.scene.auto_battery = True
+
+  # Add electrical metrics
+  cfg.metrics = {
+    **electrical_metrics_preset(entity_name="cartpole"),
+  }
+
+  # Use direct torque control (not PID)
+  cfg.actions = {
+    "effort": JointEffortActionCfg(
+      entity_name="cartpole",
+      actuator_names=("slider",),
+      scale=1.0,
+    ),
   }
 
   if play:

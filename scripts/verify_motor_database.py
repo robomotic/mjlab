@@ -27,6 +27,16 @@ motor = MotorSpecification(
   motor_id="verification_motor",
   manufacturer="VerifyTest",
   model="VT-1",
+  voltage_range=(0.0, 24.0),
+  resistance=1.0,
+  inductance=0.001,
+  motor_constant_kt=0.1,
+  motor_constant_ke=0.1,
+  peak_torque=10.0,
+  no_load_speed=10.0,
+  thermal_resistance=5.0,
+  thermal_time_constant=300.0,
+  max_winding_temperature=120.0,
   gear_ratio=10.0,
 )
 print(f"   ✓ Created motor: {motor.motor_id}")

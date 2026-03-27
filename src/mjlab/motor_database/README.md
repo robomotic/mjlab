@@ -198,7 +198,95 @@ The motor will be automatically loaded (from local database or GitHub) when the 
 
 ## Examples
 
-See [examples/motor_database_basic.py](../../../examples/motor_database_basic.py) for comprehensive examples.
+### Running Examples Locally
+
+**Basic motor database usage:**
+```bash
+# From repository root
+uv run python examples/motor_database_basic.py
+```
+
+This example demonstrates:
+- Loading motors from built-in database
+- Loading motors from remote GitHub repository (automatic fallback)
+- Accessing motor properties (torque, speed, resistance, etc.)
+- Adding custom search paths
+
+**Interactive CartPole with electrical motors:**
+```bash
+# Run CartPole with sinusoidal torque commands
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --viewer viser
+
+# Try different frequencies and amplitudes
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --sin_frequency 2.0 --sin_amplitude 20.0 --viewer viser
+
+# Compare with zero agent (no torque)
+uv run play Mjlab-Cartpole-Constant-Rotation --agent zero --viewer viser
+```
+
+This demonstrates:
+- Electrical motor actuators with realistic voltage/current/power
+- Real-time metrics visualization (voltage, current, power, temperature)
+- Direct torque control (no PD feedback)
+- Battery state tracking (SOC, voltage sag, thermal heating)
+
+### Jupyter Notebooks (Colab Compatible)
+
+**Tutorial 1: Motor Physics Fundamentals**
+- Notebook: [`notebooks/electrical/01_intro.ipynb`](../../../notebooks/electrical/01_intro.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/electrical/01_intro.ipynb)
+- Topics:
+  - Electrical motor modeling (voltage, current, back-EMF)
+  - RL circuit dynamics and inductance effects
+  - Thermal modeling (I²R heating, temperature limits)
+  - Battery discharge and voltage sag
+  - Real-time metrics visualization
+
+**Tutorial 2: Motor Sizing with CartPole**
+- Notebook: [`notebooks/electrical/02_intro.ipynb`](../../../notebooks/electrical/02_intro.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/electrical/02_intro.ipynb)
+- Topics:
+  - Comparing underpowered vs well-sized vs overpowered motors
+  - Sinusoidal torque patterns (simulating walking gaits)
+  - Power consumption analysis
+  - The 2-4× sizing rule (motors at 25-50% of peak torque)
+  - Motor saturation and thermal limits
+
+**Humanoid Motor Demo (Automatic API)**
+- Notebook: [`notebooks/humanoid_motor_demo_easy.ipynb`](../../../notebooks/humanoid_motor_demo_easy.ipynb)
+- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/humanoid_motor_demo_easy.ipynb)
+- Topics:
+  - Unitree G1 humanoid with automatic motor/battery discovery
+  - Arm movement simulation with real motor specs
+  - Automatic current calculation from torque
+  - Battery discharge tracking (SOC, voltage, temperature)
+  - 90% less code than manual approach
+
+**Running Locally:**
+```bash
+# Install Jupyter if not already installed
+uv add --dev jupyter matplotlib ipywidgets
+
+# Run Tutorial 1
+uv run jupyter notebook notebooks/electrical/01_intro.ipynb
+
+# Run Tutorial 2
+uv run jupyter notebook notebooks/electrical/02_intro.ipynb
+
+# Run Humanoid Demo
+uv run jupyter notebook notebooks/humanoid_motor_demo_easy.ipynb
+```
+
+### Key Features Demonstrated
+
+All examples showcase:
+- ✅ **Auto-discovery** of motors from XML custom tags
+- ✅ **Automatic** electrical calculations (voltage, current, power)
+- ✅ **Real-time** battery tracking (SOC, voltage sag, thermal heating)
+- ✅ **Realistic** motor physics (saturation, back-EMF, inductance)
+- ✅ **Zero manual** physics - just load and step!
+
+See [examples/motor_database_basic.py](../../../examples/motor_database_basic.py) for programmatic motor loading examples.
 
 ## Community Repository
 
