@@ -12,7 +12,10 @@ from mjlab.battery_database import (
   get_default_search_paths,
   load_battery_spec,
 )
-from mjlab.battery_database.database import BUILTIN_BATTERIES_PATH
+from mjlab.battery_database.database import (
+  BUILTIN_BATTERIES_PATH,
+  _extract_manufacturer,
+)
 
 # --- Battery Spec Tests ---
 
@@ -299,7 +302,9 @@ def test_load_from_builtin_lifepo4():
 
 def test_load_battery_not_found():
   """Test proper error when battery doesn't exist."""
-  with pytest.raises(FileNotFoundError, match="not found in search paths"):
+  with pytest.raises(
+    FileNotFoundError, match="not found in local paths or remote repositories"
+  ):
     load_battery_spec("nonexistent_battery_12345")
 
 
@@ -496,3 +501,42 @@ def test_no_source_error():
   """Test error when no source is provided."""
   with pytest.raises(ValueError, match="Must provide one"):
     load_battery_spec()
+
+
+# --- Remote Repository Tests ---
+
+
+def test_extract_manufacturer():
+  """Test manufacturer extraction from battery ID."""
+  assert _extract_manufacturer("turnigy_6s2p_5000mah") == "turnigy"
+  assert _extract_manufacturer("unitree_g1_9ah") == "unitree"
+  assert _extract_manufacturer("samsung_21700_50e") == "samsung"
+  assert _extract_manufacturer("lifepo4_12s_10ah") == "lifepo4"
+  assert _extract_manufacturer("nobrand") is None
+  assert _extract_manufacturer("") is None
+
+
+@pytest.mark.network
+def test_load_from_remote_repository():
+  """Test loading battery from remote GitHub repository (requires network)."""
+  pytest.skip("Network test - run manually or enable with pytest -m network")
+  # Clear cache to force download
+  import shutil
+
+  cache_dir = Path.home() / ".mjlab" / "cache" / "batteries"
+  if cache_dir.exists():
+    shutil.rmtree(cache_dir)
+
+  # Load from remote repository
+  battery = load_battery_spec("unitree_g1_9ah")
+
+  assert battery.battery_id == "unitree_g1_9ah"
+  assert battery.manufacturer == "Unitree Robotics"
+  assert battery.chemistry == "Li-ion"
+  assert battery.cells_series == 6
+  assert battery.capacity_ah == 9.0
+
+  # Verify it was cached
+  assert cache_dir.exists()
+  cache_files = list(cache_dir.glob("*.json"))
+  assert len(cache_files) > 0

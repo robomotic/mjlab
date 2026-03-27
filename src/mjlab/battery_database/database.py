@@ -14,6 +14,11 @@ from mjlab.battery_database.battery_spec import BatterySpecification
 # Module paths
 BUILTIN_BATTERIES_PATH = Path(__file__).parent / "batteries"
 
+# Remote battery repositories
+REMOTE_BATTERY_REPOSITORIES = [
+  "https://raw.githubusercontent.com/robomotic/mujoco-batteries/master/battery_assets"
+]
+
 # Global search paths (can be extended via add_battery_database_path)
 _SEARCH_PATHS: list[Path] = []
 
@@ -77,6 +82,73 @@ def add_battery_database_path(path: str | Path) -> None:
   _SEARCH_PATHS.append(path)
 
 
+def _extract_manufacturer(battery_id: str) -> str | None:
+  """Extract manufacturer from battery ID.
+
+  Assumes manufacturer is the first underscore-separated component.
+
+  Examples:
+    >>> _extract_manufacturer("turnigy_6s2p_5000mah")
+    'turnigy'
+    >>> _extract_manufacturer("unitree_g1_9ah")
+    'unitree'
+    >>> _extract_manufacturer("no_underscore")
+    None
+
+  Args:
+    battery_id: The battery identifier (e.g., "unitree_g1_9ah")
+
+  Returns:
+    Manufacturer name (lowercase) or None if no underscore
+  """
+  if "_" not in battery_id:
+    return None
+  return battery_id.split("_")[0].lower()
+
+
+def _try_remote_repositories(battery_id: str) -> BatterySpecification:
+  """Attempt to load battery spec from remote repositories.
+
+  Tries each configured repository with manufacturer subdirectory pattern,
+  falling back to flat structure.
+
+  Args:
+    battery_id: The battery identifier to load
+
+  Returns:
+    BatterySpecification loaded from remote repository
+
+  Raises:
+    FileNotFoundError: If battery not found in any remote repository
+  """
+  manufacturer = _extract_manufacturer(battery_id)
+  attempted_urls = []
+
+  for base_url in REMOTE_BATTERY_REPOSITORIES:
+    # Try with manufacturer subdirectory (preferred structure)
+    if manufacturer:
+      url = f"{base_url}/{manufacturer}/{battery_id}.json"
+      attempted_urls.append(url)
+      try:
+        return _load_from_url(url)
+      except Exception:
+        pass
+
+    # Try flat structure (fallback)
+    url = f"{base_url}/{battery_id}.json"
+    attempted_urls.append(url)
+    try:
+      return _load_from_url(url)
+    except Exception:
+      pass
+
+  # All attempts failed
+  raise FileNotFoundError(
+    f"Battery '{battery_id}' not found in any remote repository. "
+    f"Attempted URLs:\n" + "\n".join(f"  - {u}" for u in attempted_urls)
+  )
+
+
 def load_battery_spec(
   battery_id: str | None = None,
   *,
@@ -85,6 +157,16 @@ def load_battery_spec(
   file: str | Path | None = None,
 ) -> BatterySpecification:
   """Load battery specification from various sources.
+
+  When loading by ID, the system searches in this order:
+  1. User directory (~/.mjlab/batteries/)
+  2. Project directory (./batteries/)
+  3. Environment variable ($MJLAB_BATTERY_PATH)
+  4. Programmatically added paths
+  5. Built-in database
+  6. Remote repositories (GitHub with automatic caching)
+
+  Downloaded batteries are cached at ~/.mjlab/cache/batteries/
 
   Args:
       battery_id: Battery ID to search for in database paths.
@@ -100,14 +182,17 @@ def load_battery_spec(
       FileNotFoundError: If battery cannot be found.
 
   Examples:
-      >>> # Load from database by ID
+      >>> # Load from built-in database
       >>> battery = load_battery_spec("turnigy_6s2p_5000mah")
+
+      >>> # Load from GitHub (automatic fallback)
+      >>> battery = load_battery_spec("unitree_g1_9ah")
+
+      >>> # Load from explicit URL
+      >>> battery = load_battery_spec(url="https://example.com/battery.json")
 
       >>> # Load from file
       >>> battery = load_battery_spec(file="/path/to/battery.json")
-
-      >>> # Load from URL
-      >>> battery = load_battery_spec(url="https://example.com/battery.json")
 
       >>> # Search in specific directory
       >>> battery = load_battery_spec("custom_battery", path="/my/batteries")
@@ -138,14 +223,19 @@ def load_battery_spec(
 def _load_by_id(
   battery_id: str, search_path: str | Path | None = None
 ) -> BatterySpecification:
-  """Load battery by ID from search paths."""
+  """Load battery by ID from search paths or remote repositories.
+
+  Search order:
+  1. Local search paths (user, project, env, added, built-in)
+  2. Remote repositories (GitHub with automatic caching)
+  """
   # Determine search paths
   if search_path is not None:
     search_paths = [Path(search_path).expanduser().resolve()]
   else:
     search_paths = get_default_search_paths()
 
-  # Search for battery_id.json in search paths
+  # Try local paths first
   for base_path in search_paths:
     # Try direct file: battery_id.json
     candidate = base_path / f"{battery_id}.json"
@@ -161,11 +251,17 @@ def _load_by_id(
     for candidate in base_path.rglob(f"{battery_id}.json"):
       return _load_from_file(candidate)
 
-  # Not found
-  raise FileNotFoundError(
-    f"Battery '{battery_id}' not found in search paths: "
-    f"{[str(p) for p in search_paths]}"
-  )
+  # Try remote repositories as fallback
+  try:
+    return _try_remote_repositories(battery_id)
+  except Exception as remote_error:
+    # Provide comprehensive error message
+    raise FileNotFoundError(
+      f"Battery '{battery_id}' not found in local paths or remote repositories.\n"
+      f"Local paths searched:\n"
+      + "\n".join(f"  - {p}" for p in search_paths)
+      + f"\n{remote_error}"
+    ) from remote_error
 
 
 def _load_from_file(file_path: Path) -> BatterySpecification:
