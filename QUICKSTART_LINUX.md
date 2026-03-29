@@ -171,6 +171,45 @@ uv run jupyter notebook notebooks/electrical/01_intro.ipynb
 
 ## 📝 Additional Commands
 
+### Run Interactive CartPole Simulation:
+
+Run CartPole with electrical motor and battery physics:
+
+```bash
+# Basic sinusoidal torque command
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --viewer viser
+
+# Custom frequency and amplitude
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --sin_frequency 2.0 --sin_amplitude 20.0 --viewer viser
+
+# Record video (saved to logs/play/...)
+uv run play Mjlab-Cartpole-Constant-Rotation --agent sin --viewer viser --video --video_length 500
+
+# Different agents
+uv run play Mjlab-Cartpole-Constant-Rotation --agent zero --viewer viser  # No torque
+uv run play Mjlab-Cartpole-Constant-Rotation --agent random --viewer viser  # Random torque
+```
+
+**Agent options:**
+- `--agent sin` - Sinusoidal torque pattern (simulates walking gaits)
+  - `--sin_frequency 1.0` - Frequency in Hz (default: 1 Hz)
+  - `--sin_amplitude 15.0` - Amplitude in N⋅m (default: 15 N⋅m)
+- `--agent zero` - No torque (gravity only)
+- `--agent random` - Random torque commands
+- `--agent trained` - Use trained RL policy (requires checkpoint)
+
+**Video recording options:**
+- `--video` - Enable video recording
+- `--video_length 500` - Record 500 frames (default: 200)
+- `--video_width 1280` - Video width in pixels (default: 640)
+- `--video_height 720` - Video height in pixels (default: 480)
+
+The viewer shows real-time metrics:
+- Motor voltage, current, power
+- Battery state of charge (SOC)
+- Motor and battery temperature
+- Torque commands vs actual torque
+
 ### Run all notebooks in a browser interface:
 ```bash
 uv run jupyter notebook
