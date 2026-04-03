@@ -327,6 +327,96 @@ def test_thermal_heating(device, robot_xml, test_motor_spec):
   assert T_final > T_initial
 
 
+def test_thermal_cooling_to_ambient(device, robot_xml):
+  """Test that temperature decays back to ambient when motor is idle."""
+  # Use a fast thermal time constant so cooling completes in few steps.
+  fast_motor = MotorSpecification(
+    motor_id="cooling_motor",
+    manufacturer="Test",
+    model="CM-1",
+    gear_ratio=10.0,
+    reflected_inertia=0.01,
+    rotation_angle_range=(-3.14, 3.14),
+    voltage_range=(0.0, 48.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    stall_torque=10.0,
+    peak_torque=10.0,
+    continuous_torque=5.0,
+    no_load_speed=100.0,
+    no_load_current=0.1,
+    stall_current=100.0,
+    operating_current=50.0,
+    thermal_resistance=2.0,
+    thermal_time_constant=0.5,  # Fast: 0.5 s
+    max_winding_temperature=150.0,
+    ambient_temperature=25.0,
+    encoder_resolution=1000,
+    encoder_type="incremental",
+    feedback_sensors=["position", "velocity", "current"],
+    protocol="CAN",
+    protocol_params={},
+  )
+
+  entity = create_entity_with_actuator(
+    robot_xml,
+    ElectricalMotorActuatorCfg(
+      target_names_expr=("joint.*",),
+      motor_spec=fast_motor,
+      stiffness=100.0,
+      damping=10.0,
+      saturation_effort=fast_motor.peak_torque,
+      velocity_limit=fast_motor.no_load_speed,
+      effort_limit=fast_motor.continuous_torque,
+    ),
+  )
+
+  entity, sim = initialize_entity(entity, device)
+  from mjlab.actuator import ElectricalMotorActuator
+
+  actuator = entity.actuators[0]
+  assert isinstance(actuator, ElectricalMotorActuator)
+
+  T_ambient = fast_motor.ambient_temperature
+  dt = 0.002
+
+  # Phase 1: heat the motor under load (5 thermal time constants = 2.5 s)
+  entity.set_joint_position_target(torch.tensor([[1.0]], device=device))
+  entity.set_joint_velocity_target(torch.zeros(1, 1, device=device))
+  entity.set_joint_effort_target(torch.zeros(1, 1, device=device))
+
+  n_heat = int(2.5 / dt)
+  for _ in range(n_heat):
+    entity.write_data_to_sim()
+    sim.step()
+    actuator.update(dt)
+
+  assert actuator.winding_temperature is not None
+  T_hot = actuator.winding_temperature[0, 0].item()
+  assert T_hot > T_ambient + 1.0, "Motor must heat up before cooling test"
+
+  # Phase 2: remove load and let the motor cool (zero targets)
+  entity.set_joint_position_target(torch.zeros(1, 1, device=device))
+  entity.set_joint_velocity_target(torch.zeros(1, 1, device=device))
+  entity.set_joint_effort_target(torch.zeros(1, 1, device=device))
+
+  n_cool = int(5.0 / dt)  # 10 thermal time constants — should fully cool
+  for _ in range(n_cool):
+    entity.write_data_to_sim()
+    sim.step()
+    actuator.update(dt)
+
+  T_cooled = actuator.winding_temperature[0, 0].item()
+
+  # Temperature should have returned close to ambient
+  assert T_cooled < T_hot, "Temperature must decrease during cooling"
+  assert abs(T_cooled - T_ambient) < 1.0, (
+    f"Expected temperature near ambient ({T_ambient}), got {T_cooled}"
+  )
+
+
 def test_temperature_clamping(device, robot_xml, test_motor_spec):
   """Test that temperature stays within [T_ambient, T_max]."""
   entity = create_entity_with_actuator(
