@@ -251,7 +251,7 @@ This demonstrates:
 - [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/robomotic/mjlab/blob/feature/motor-database-extension/notebooks/electrical/02_intro.ipynb)
 - Topics:
   - Comparing underpowered vs well-sized vs overpowered motors
-  - Sinusoidal torque patterns (simulating walking gaits)
+  - Sinusoidal torque patterns for cyclic load testing
   - Power consumption analysis
   - The 2-4× sizing rule (motors at 25-50% of peak torque)
   - Motor saturation and thermal limits

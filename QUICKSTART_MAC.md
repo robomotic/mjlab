@@ -157,7 +157,7 @@ uv run play Mjlab-Cartpole-Constant-Rotation --agent random --viewer viser  # Ra
 ```
 
 **Agent options:**
-- `--agent sin` - Sinusoidal torque pattern (simulates walking gaits)
+- `--agent sin` - Sinusoidal torque pattern (cyclic load testing)
   - `--sin_frequency 1.0` - Frequency in Hz (default: 1 Hz)
   - `--sin_amplitude 15.0` - Amplitude in N⋅m (default: 15 N⋅m)
 - `--agent zero` - No torque (gravity only)

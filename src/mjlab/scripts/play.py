@@ -207,8 +207,8 @@ def run_play(task_id: str, cfg: PlayConfig):
       class PolicySin:
         """Sinusoidal torque command generator.
 
-        Generates sine wave torque pattern to simulate periodic loads
-        like walking gaits. All action dimensions receive the same signal.
+        Generates sine wave torque pattern for cyclic load testing.
+        All action dimensions receive the same signal.
         """
 
         def __init__(self, shape, freq, amp, dt):
