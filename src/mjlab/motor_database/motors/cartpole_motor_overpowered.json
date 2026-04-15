@@ -4,6 +4,7 @@
   "model": "CartServo-7000",
   "step_file": null,
   "stl_file": null,
+  "weight": 2.5,
   "gear_ratio": 1.0,
   "reflected_inertia": 0.001,
   "rotation_angle_range": [-100.0, 100.0],
