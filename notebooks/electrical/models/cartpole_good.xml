@@ -24,8 +24,8 @@
     <geom name="rail1" type="capsule" pos="0 .07 1" zaxis="1 0 0" size="0.02 2" material="decoration"/>
     <geom name="rail2" type="capsule" pos="0 -.07 1" zaxis="1 0 0" size="0.02 2" material="decoration"/>
     <body name="cart" pos="0 0 1">
-      <joint name="slider" type="slide" limited="true" axis="1 0 0" range="-1.8 1.8" solreflimit=".08 1" damping="5e-4"/>
-      <geom name="cart" type="box" size="0.2 0.15 0.1" material="cart" mass="1.8"/>
+      <joint name="slider" type="slide" limited="true" axis="1 0 0" range="-1.8 1.8" solreflimit=".08 1" damping="10" stiffness="100"/>
+      <geom name="cart" type="box" size="0.2 0.15 0.1" material="cart" mass="1.0"/>
       <body name="pole_1" childclass="pole">
         <joint name="hinge_1"/>
         <geom name="pole_1"/>
@@ -39,7 +39,7 @@
              gainprm="100 0 0" biasprm="0 -100 -10"
              dyntype="none" biastype="affine"
              ctrllimited="true" ctrlrange="-1 1"
-             forcelimited="true" forcerange="-50 50"/>
+             forcelimited="true" forcerange="-60 60"/>
   </actuator>
 
   <custom>

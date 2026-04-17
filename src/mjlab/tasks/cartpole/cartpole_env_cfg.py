@@ -438,9 +438,16 @@ def cartpole_constant_rotation_env_cfg(
 
   cfg = _make_env_cfg(swing_up=False)  # Base configuration
 
-  # Replace entity XML with custom motor variant
+  # Replace entity XML with custom motor variant.
+  # Delete the XML <general> actuator so only the ElectricalMotorActuator drives
+  # the joint — otherwise the biasprm spring in the XML actuator adds a restoring
+  # force that is clamped differently per model (by forcerange), confounding the
+  # motor sizing comparison.
   def _get_custom_spec() -> mujoco.MjSpec:
-    return mujoco.MjSpec.from_file(motor_xml_path)
+    spec = mujoco.MjSpec.from_file(motor_xml_path)
+    for act in list(spec.actuators):
+      spec.delete(act)
+    return spec
 
   # Load motor spec from XML to manually configure with zero PD gains
   # Parse XML to find motor spec name
