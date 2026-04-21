@@ -8,7 +8,7 @@
   "gear_ratio": 1.0,
   "reflected_inertia": 0.001,
   "rotation_angle_range": [-100.0, 100.0],
-  "voltage_range": [0.0, 48.0],
+  "voltage_range": [-48.0, 48.0],
   "resistance": 0.3,
   "inductance": 0.0002,
   "motor_constant_kt": 3.5,
