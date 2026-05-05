@@ -246,6 +246,13 @@ class ElectricalMotorActuator(
     )
     self.current = numerator / denominator
 
+    # Clamp to drive electronics peak current limit (stall_current).
+    self.current = torch.clamp(
+      self.current,
+      min=-self.cfg.motor_spec.stall_current,
+      max=self.cfg.motor_spec.stall_current,
+    )
+
     # 7. Store previous current for next step
     self._previous_current = self.current.clone()
 

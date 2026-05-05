@@ -417,6 +417,73 @@ def test_thermal_cooling_to_ambient(device, robot_xml):
   )
 
 
+def test_current_clamping(device, robot_xml):
+  """Test that current is clamped to stall_current (drive electronics limit)."""
+  # Motor with a low stall_current so the clamp is the binding constraint.
+  # stall_current=5 A * Kt=0.1 → max torque 0.5 N·m, well below peak_torque=10 N·m.
+  low_current_motor = MotorSpecification(
+    motor_id="low_current_motor",
+    manufacturer="Test",
+    model="LC-1",
+    gear_ratio=1.0,
+    reflected_inertia=0.0,
+    rotation_angle_range=(-3.14, 3.14),
+    voltage_range=(0.0, 48.0),
+    resistance=1.0,
+    inductance=0.001,
+    motor_constant_kt=0.1,
+    motor_constant_ke=0.1,
+    stall_current=5.0,
+    peak_torque=10.0,
+    no_load_speed=100.0,
+    thermal_resistance=2.0,
+    thermal_time_constant=100.0,
+    max_winding_temperature=150.0,
+    ambient_temperature=25.0,
+  )
+
+  entity = create_entity_with_actuator(
+    robot_xml,
+    ElectricalMotorActuatorCfg(
+      target_names_expr=("joint.*",),
+      motor_spec=low_current_motor,
+      stiffness=100000.0,  # Very high stiffness to demand current far above stall_current
+      damping=0.0,
+      saturation_effort=low_current_motor.peak_torque,
+      velocity_limit=low_current_motor.no_load_speed,
+      effort_limit=low_current_motor.peak_torque,
+    ),
+  )
+
+  entity, sim = initialize_entity(entity, device)
+  from mjlab.actuator import ElectricalMotorActuator
+
+  actuator = entity.actuators[0]
+  assert isinstance(actuator, ElectricalMotorActuator)
+
+  # Large position error → demands huge current without the clamp
+  entity.set_joint_position_target(torch.tensor([[10.0]], device=device))
+  entity.set_joint_velocity_target(torch.zeros(1, 1, device=device))
+  entity.set_joint_effort_target(torch.zeros(1, 1, device=device))
+
+  entity.write_data_to_sim()
+  sim.step()
+
+  assert actuator.current is not None
+  current = actuator.current[0, 0].item()
+  assert abs(current) <= low_current_motor.stall_current + 1e-6, (
+    f"Current {current:.3f} A exceeds stall_current {low_current_motor.stall_current} A"
+  )
+  # Output torque must also be bounded by stall_current * Kt
+  ctrl = sim.data.ctrl[0, 0].item()
+  max_torque_from_current = (
+    low_current_motor.stall_current * low_current_motor.motor_constant_kt
+  )
+  assert abs(ctrl) <= max_torque_from_current + 1e-6, (
+    f"Control torque {ctrl:.3f} N·m exceeds current-limited max {max_torque_from_current} N·m"
+  )
+
+
 def test_temperature_clamping(device, robot_xml, test_motor_spec):
   """Test that temperature stays within [T_ambient, T_max]."""
   entity = create_entity_with_actuator(
